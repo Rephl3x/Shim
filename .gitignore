@@ -1,0 +1,5 @@
+/dist/
+/reference/
+/third-party/
+*.local.json
+*.local.png
