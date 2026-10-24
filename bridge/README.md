@@ -1,8 +1,8 @@
 # FH Rig Bridge 0.3.2
 
-Our Windows app combines physical racing controls into one virtual force-feedback controller. It contains our own DirectInput reader, input mapper, vJoy force-feedback packet decoder, and DirectInput effect forwarding code. It does not run Forza EmuWheel, UCR, or another mapper.
+FH Rig Bridge combines a MOZA wheel, pedals, shifters, handbrake and other selected physical controls into one vJoy controller for Forza Motorsport and Forza Horizon. It reads controls through DirectInput, applies learnable mappings and calibration, hides the selected physical devices through HidHide while bridging, and forwards the game's force feedback from vJoy to the physical steering wheel. The app has its own input reader, mapper, vJoy force-feedback decoder and DirectInput effect forwarding; it does not run Forza EmuWheel, UCR or another mapper.
 
-Version 0.3.1 fixes clipped Day/Night labels in the main window and setup wizard. Version 0.3.0 added a cleaner Drive dashboard, separate Mappings/Live inputs/Drivers/Activity pages, saved Day/Night mode across the main window and setup wizard, and live FFB strength adjustment. User testing confirmed working controls and FFB in Forza on the MOZA rig with 0.2.2. Existing device mappings and calibration remain compatible.
+Version 0.3.2 configures and verifies the selected vJoy slot as the final Save step, after device selection and calibration. The profile is saved only after that verification succeeds. Version 0.3.0 added the Drive dashboard, separate Mappings/Live inputs/Drivers/Activity pages, saved Day/Night mode and live FFB strength adjustment; 0.3.1 fixed clipped theme labels. User testing confirmed working controls and force feedback in Forza on the MOZA rig with 0.2.2. Existing mappings and calibration remain compatible.
 
 ## Everyday controls
 
