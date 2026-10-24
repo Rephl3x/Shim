@@ -1,4 +1,5 @@
 /dist/
+/artifacts/
 /reference/
 /third-party/
 *.local.json
