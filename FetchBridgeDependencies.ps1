@@ -1,10 +1,11 @@
 [CmdletBinding()]
-param()
+param([string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $dependencies = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'bridge\dependencies.lock.json') -Raw | ConvertFrom-Json
 $cachePath = Join-Path $PSScriptRoot 'third-party\rig-bridge'
-$outputDirectory = Join-Path $PSScriptRoot 'dist\bridge'
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $PSScriptRoot 'dist\bridge' }
+$outputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $driverPath = Join-Path $outputDirectory 'drivers'
 $runtimePath = Join-Path $outputDirectory 'runtime\x64'
 $licensePath = Join-Path $outputDirectory 'licenses'

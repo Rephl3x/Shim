@@ -234,6 +234,7 @@ namespace RigBridge
         private void TickRuntime()
         {
             if (runtime == null) return;
+            foreach (string message in runtime.TakeMessages()) Log(message);
             if (!runtime.Running)
             {
                 var error = runtime.Error; runtime.Dispose(); runtime = null; learning = false;
@@ -265,7 +266,7 @@ namespace RigBridge
                 }
                 else if (DateTime.UtcNow >= learnDeadline) { learning = false; Log("Learn timed out. Return the control to rest and try again."); }
             }
-            if (runtime.Started) status.Text = (learning ? "Learning input... " : "Running. ") + runtime.Frames + " input frames; " + runtime.FfbPackets + " FFB packets received.";
+            if (runtime.Started) status.Text = (learning ? "Learning input... " : "Running. ") + runtime.Frames + " frames; " + runtime.FfbPackets + " FFB packets. " + runtime.FfbStatus;
         }
         private static string OutputName(Binding binding) { return (String.IsNullOrEmpty(binding.Label) ? "" : binding.Label + " / ") + (binding.OutputKind == "Axis" ? Mapper.AxisNames[binding.OutputIndex] : binding.OutputKind + " " + (binding.OutputIndex + 1)); }
         private void RenderMappings()

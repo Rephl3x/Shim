@@ -1,8 +1,9 @@
 [CmdletBinding()]
-param([switch]$Test)
+param([switch]$Test, [string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$outputDirectory = Join-Path $PSScriptRoot 'dist\bridge'
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $PSScriptRoot 'dist\bridge' }
+$outputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 [void](New-Item -ItemType Directory -Path $outputDirectory -Force)
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'bridge\src') -Filter '*.cs' | ForEach-Object FullName)
 $references = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll', '/r:System.Web.Extensions.dll')

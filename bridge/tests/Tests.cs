@@ -21,6 +21,7 @@ namespace RigBridge.Tests
         }
         private static void Run()
         {
+            PhysicalForceTests.Run(Test);
             Test("Setup draft changes never mutate the active profile", () => {
                 var current = Profile(); current.Rig = new RigChoices { Wheel = "wheel" }; var copy = SetupLogic.Clone(current);
                 copy.Devices.Clear(); copy.Bindings[0].Invert = true; copy.Rig.Wheel = "changed";

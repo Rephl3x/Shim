@@ -182,7 +182,25 @@ namespace RigBridge
             return end < 0 ? "" : path.Substring(4, end - 4).Replace('#', '\\').ToUpperInvariant();
         }
         internal static void Check(int hr, string action)
-        { if (hr < 0) throw new InvalidOperationException(action + " failed (0x" + hr.ToString("X8") + "). Close other apps that exclusively own this controller."); }
+        { if (hr < 0) throw new InvalidOperationException(FailureMessage(hr, action)); }
+        internal static string FailureMessage(int hr, string action)
+        {
+            string reason;
+            switch (unchecked((uint)hr))
+            {
+                case 0x800704df: reason = "DIERR_ALREADYINITIALIZED: the effect is already initialized; its axis assignment cannot be set again."; break;
+                case 0x80040208: reason = "DIERR_EFFECTPLAYING: the driver cannot update these parameters while the effect is playing."; break;
+                case 0x80040205: reason = "DIERR_NOTEXCLUSIVEACQUIRED: exclusive wheel access is required. Close other apps that exclusively own this controller."; break;
+                case 0x80070005: reason = "Access denied or another app has priority. Close other controller test/FFB apps and retry."; break;
+                case 0x8007001e: reason = "DIERR_INPUTLOST: access to the wheel was lost. Stop and restart the bridge, then restart the game."; break;
+                case 0x8007000c: reason = "DIERR_NOTACQUIRED: the wheel is not acquired."; break;
+                case 0x80040201: reason = "DIERR_DEVICEFULL: the wheel has no free effect slots."; break;
+                case 0x80040209: reason = "DIERR_UNPLUGGED: the controller is disconnected."; break;
+                case 0x80070057: reason = "DIERR_INVALIDPARAM: the driver rejected an effect parameter."; break;
+                default: reason = "The controller driver rejected this operation."; break;
+            }
+            return action + " failed (0x" + hr.ToString("X8") + "). " + reason;
+        }
         private IDiDevice Create(ref Guid id)
         {
             var create = (CreateNative)Marshal.GetDelegateForFunctionPointer(Marshal.ReadIntPtr(Marshal.ReadIntPtr(api), 3 * IntPtr.Size), typeof(CreateNative));

@@ -18,24 +18,31 @@ namespace RigBridge
         private readonly object gate = new object();
         private Dictionary<string, InputState> states = new Dictionary<string, InputState>();
         private readonly ConcurrentQueue<FfbPacket> packets = new ConcurrentQueue<FfbPacket>();
+        private readonly ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
+        private long received;
         private Exception callbackError;
         public Exception Error { get; private set; }
         public long Frames { get; private set; }
-        public long FfbPackets { get; private set; }
+        public long FfbPackets { get { return Interlocked.Read(ref received); } }
+        public string FfbStatus { get; private set; }
         public bool Running { get { return thread.IsAlive; } }
         public bool Started { get; private set; }
         public BridgeRuntime(BridgeProfile profile, IntPtr window, bool monitorOnly)
         {
             this.profile = profile; this.window = window; this.monitorOnly = monitorOnly;
+            FfbStatus = monitorOnly ? "Read-only monitor." : profile.EnableFfb ? "Waiting for game FFB packets." : "FFB forwarding is off.";
             thread = new Thread(Run) { IsBackground = true, Name = "FH Rig Bridge input and FFB" };
             thread.SetApartmentState(ApartmentState.MTA);
         }
         public void Start() { thread.Start(); }
         public Dictionary<string, InputState> Snapshot() { lock (gate) return new Dictionary<string, InputState>(states); }
+        public List<string> TakeMessages()
+        { var result = new List<string>(); string message; while (messages.TryDequeue(out message)) result.Add(message); return result; }
         public void RequestStop() { stop.Set(); }
         private void Run()
         {
-            var readers = new List<InputReader>(); IForceSink force = null; Vjoy output = null; HideDriver hiding = null; HideRecovery recovery = null;
+            var readers = new List<InputReader>(); NativeForceSink force = null; Vjoy output = null; HideDriver hiding = null; HideRecovery recovery = null;
+            var seenTypes = new HashSet<int>(); var diagnosticClock = Stopwatch.StartNew();
             try
             {
                 using (var direct = new DirectInput())
@@ -46,6 +53,7 @@ namespace RigBridge
                         profile.Validate(all);
                         if (File.Exists(Store.RecoveryPath)) throw new InvalidOperationException("Restore the previous session's device visibility first.");
                         output = new Vjoy(profile, packet => {
+                            Interlocked.Increment(ref received);
                             if (packets.Count >= 2048) Interlocked.CompareExchange(ref callbackError, new InvalidOperationException("FFB queue overflow; bridge stopped."), null);
                             else packets.Enqueue(packet);
                         }, ex => Interlocked.CompareExchange(ref callbackError, ex, null));
@@ -74,6 +82,7 @@ namespace RigBridge
                         var steering = profile.Bindings.First(b => b.OutputKind == "Axis" && b.OutputIndex == 0);
                         uint objectId = wheel.Info.Controls.First(c => c.Kind == "Axis" && c.Index == steering.InputIndex).ObjectId;
                         force = new NativeForceSink(wheel, profile.FfbGain, profile.InvertFfb, objectId);
+                        messages.Enqueue("Physical FFB acquired: " + wheel.Info.Name + ", gain cap " + profile.FfbGain + "%. Restart Forza after any bridge restart so it sends fresh effects.");
                     }
                     var router = force == null ? null : new FfbRouter(force);
                     Started = true;
@@ -86,8 +95,19 @@ namespace RigBridge
                         if (output != null) output.Write(Mapper.Map(profile.Bindings, current));
                         FfbPacket packet;
                         int count = 0;
-                        while (count++ < 512 && packets.TryDequeue(out packet)) { if (router != null) router.Process(packet.Type, packet.Data); }
-                        if (router != null) FfbPackets = router.Packets;
+                        while (count++ < 512 && packets.TryDequeue(out packet))
+                        {
+                            if (seenTypes.Add(packet.Type)) messages.Enqueue("First FFB report type " + packet.Type + ": " + BitConverter.ToString(packet.Data));
+                            if (router != null) router.Process(packet.Type, packet.Data);
+                        }
+                        if (force != null)
+                        {
+                            FfbStatus = FfbPackets == 0 ? "Waiting for game FFB packets. Launch/restart Forza after the bridge." : force.Status;
+                            if (diagnosticClock.ElapsedMilliseconds >= 5000)
+                            {
+                                messages.Enqueue("FFB: " + FfbPackets + " packets received. " + FfbStatus); diagnosticClock.Restart();
+                            }
+                        }
                         Frames++;
                         stop.WaitOne(4);
                     }
@@ -96,6 +116,7 @@ namespace RigBridge
             catch (Exception ex) { Error = ex; }
             finally
             {
+                if (!monitorOnly) messages.Enqueue("Session FFB totals: " + FfbPackets + " packets. " + (force == null ? "Physical forwarding was not active." : force.Status));
                 // Keep cleaning up even if a disconnected device rejects one step.
                 Cleanup(() => { if (force != null) force.Dispose(); });
                 Cleanup(() => { if (output != null) output.Dispose(); });

@@ -17,6 +17,7 @@ namespace RigBridge
             try
             {
                 if (args.Length == 2 && args[0] == "--watchdog") { Watchdog(args[1]); return 0; }
+                if (args.Length == 2 && args[0] == "--check-ffb-update") { ForceFeedbackCheck.Run(args[1]); return 0; }
                 if (args.Length == 2 && args[0] == "--restore-visibility")
                 {
                     object before;
