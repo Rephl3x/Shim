@@ -112,7 +112,7 @@ namespace RigBridge
         private readonly Dictionary<int, int> types = new Dictionary<int, int>();
         private readonly Dictionary<int, ForceEffect> previous = new Dictionary<int, ForceEffect>();
         private readonly Dictionary<int, int[]> previousData = new Dictionary<int, int[]>();
-        private readonly int limit;
+        private int limit;
         private readonly bool invert;
         private readonly uint axis;
         private int deviceGain = 10000;
@@ -124,6 +124,14 @@ namespace RigBridge
         public bool ActuatorsEnabled { get; private set; }
         public bool Paused { get; private set; }
         public int EffectiveGain { get { return deviceGain * limit / 100; } }
+        public int StrengthLimit { get { return limit; } }
+        public void SetStrength(int value)
+        {
+            if (value < 0 || value > 100) throw new ArgumentOutOfRangeException("value", "FFB strength must be from 0 to 100 percent.");
+            if (value == limit) return;
+            // Only device gain changes: keep effect objects, playback, game gain, and actuator state.
+            SetDword(7, deviceGain * value / 100); limit = value;
+        }
         public string Status { get { return "Wheel: " + Created + " created, " + Updated + " updates, " + Starts + " starts accepted; gain " + (EffectiveGain / 100.0).ToString("0.#") + "%" + (!ActuatorsEnabled ? "; actuators muted" : "") + (Paused ? "; paused" : ""); } }
         public NativeForceSink(InputReader wheel, int limit, bool invert, uint axis)
             : this(new PhysicalForceDevice(wheel.Device), limit, invert, axis) { }

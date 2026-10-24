@@ -49,11 +49,12 @@ namespace RigBridge
                 Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
                 if (args.Length >= 2 && args[0] == "--preview-wizard")
                 {
+                    Appearance.Load(); if (args.Length >= 4) Appearance.Set(args[3], false);
                     BridgeProfile saved = File.Exists(Store.ProfilePath) ? Store.Read<BridgeProfile>(Store.ProfilePath) : new BridgeProfile();
-                    using (var direct = new DirectInput()) Application.Run(new SetupWizard(saved, direct.Enumerate(), args[1], args.Length == 3 ? Int32.Parse(args[2]) : 0));
+                    using (var direct = new DirectInput()) Application.Run(new SetupWizard(saved, direct.Enumerate(), args[1], args.Length >= 3 ? Int32.Parse(args[2]) : 0));
                     return 0;
                 }
-                string preview = args.Length == 2 && args[0] == "--preview" ? args[1] : null;
+                string preview = args.Length >= 2 && args.Length <= 4 && args[0] == "--preview" ? args[1] : null;
                 if (args.Length > 0 && preview == null) throw new ArgumentException("Usage: FH-Rig-Bridge.exe [--diagnose report.json | --restore-visibility report.json | --preview image.png | --preview-wizard image.png page]");
                 using (var mutex = new Mutex(false, "Local\\FHRigBridge-" + System.Security.Principal.WindowsIdentity.GetCurrent().User.Value))
                 {
@@ -62,7 +63,7 @@ namespace RigBridge
                     {
                         try { owns = mutex.WaitOne(0); } catch (AbandonedMutexException) { owns = true; }
                         if (!owns) throw new InvalidOperationException("FH Rig Bridge is already running in this Windows session.");
-                        Application.Run(new BridgeForm(preview));
+                        Application.Run(new BridgeForm(preview, preview != null && args.Length >= 3 ? args[2] : null, preview != null && args.Length >= 4 ? args[3] : null));
                     }
                     finally { if (owns) mutex.ReleaseMutex(); }
                 }

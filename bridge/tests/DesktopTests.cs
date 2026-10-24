@@ -29,8 +29,11 @@ namespace RigBridge.Tests
             string draftPath = Path.Combine(Store.DirectoryPath, "setup-draft.json");
             byte[] previousDraft = File.Exists(draftPath) ? File.ReadAllBytes(draftPath) : null;
             byte[] previousProfile = File.Exists(Store.ProfilePath) ? File.ReadAllBytes(Store.ProfilePath) : null;
+            byte[] previousAppearance = File.Exists(Appearance.Path) ? File.ReadAllBytes(Appearance.Path) : null;
+            Appearance.Load(); string previousMode = Appearance.Mode;
             try
             {
+                MainWindowChecks();
                 using (var direct = new DirectInput())
                 {
                     var devices = direct.Enumerate().Where(d => !d.Virtual).ToList();
@@ -52,6 +55,10 @@ namespace RigBridge.Tests
                         var extra = Get<CheckedListBox>(wizard, "extras"); for (int i = 0; i < extra.Items.Count; i++) extra.SetItemChecked(i, false);
                         Click(wizard, "next", 3);
                         Pump(() => { var runtime = Get<BridgeRuntime>(wizard, "monitor"); return runtime != null && runtime.Started && runtime.Frames > 2; }, "read-only wheel samples");
+                        var monitorBeforeTheme = Get<BridgeRuntime>(wizard, "monitor");
+                        Get<Button>(wizard, "themeNight").PerformClick();
+                        Assert(Appearance.Mode == "Night" && Object.ReferenceEquals(monitorBeforeTheme, Get<BridgeRuntime>(wizard, "monitor")) && monitorBeforeTheme.Running, "Wizard theme change interrupted live input monitoring");
+                        Get<Button>(wizard, "themeDay").PerformClick();
                         Assert(Get<BridgeProfile>(wizard, "draft").Devices.SequenceEqual(new[] { physical.Id }), "Role selection duplicated or omitted the wheel");
                         Get<Button>(wizard, "next").PerformClick(); Pump(() => !Get<bool>(wizard, "navigating"), "required-control validation");
                         Assert(Get<int>(wizard, "page") == 3 && Get<Label>(wizard, "message").Text.Contains("Learn every"), "Unmapped required control was accepted");
@@ -91,8 +98,43 @@ namespace RigBridge.Tests
             {
                 if (previousDraft == null) { if (File.Exists(draftPath)) File.Delete(draftPath); }
                 else File.WriteAllBytes(draftPath, previousDraft);
+                if (previousAppearance == null) { if (File.Exists(Appearance.Path)) File.Delete(Appearance.Path); }
+                else File.WriteAllBytes(Appearance.Path, previousAppearance);
+                Appearance.Set(previousMode, false);
             }
         }
+        private static void MainWindowChecks()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), "FHRigBridge-desktop-" + Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "profile.json");
+            var original = File.Exists(Store.ProfilePath) ? Store.Read<BridgeProfile>(Store.ProfilePath) : new BridgeProfile(); original.SetupVersion = SetupLogic.Version;
+            Store.Write(path, original);
+            try
+            {
+                using (var main = new BridgeForm(null, null, null, path))
+                {
+                    main.ShowInTaskbar = false; main.StartPosition = FormStartPosition.Manual; main.Location = new Point(-20000, -20000); main.Show();
+                    Pump(() => !Field<bool>(main, "scanning") && Field<System.Collections.Generic.List<PhysicalDevice>>(main, "available").Count > 0, "main window discovery");
+                    var navigation = Field<System.Collections.Generic.Dictionary<string, Button>>(main, "navigation");
+                    var views = Field<System.Collections.Generic.Dictionary<string, Control>>(main, "views");
+                    foreach (string name in new[] { "Mappings", "Drivers", "Live inputs", "Activity", "Drive" })
+                    { navigation[name].PerformClick(); Assert(views[name].Visible, "Navigation did not reveal " + name); }
+                    Field<Button>(main, "night").PerformClick();
+                    Assert(Appearance.Mode == "Night" && Store.Read<UiPreferences>(Appearance.Path).Mode == "Night", "Night preference not saved");
+                    Assert(Field<DataGridView>(main, "mappings").BackgroundColor == Appearance.Colors.Surface, "Hidden mappings page did not receive Night colors");
+                    Field<Button>(main, "day").PerformClick(); Assert(Appearance.Mode == "Day", "Day mode did not apply");
+                    int target = original.FfbGain == 43 ? 44 : 43; Field<StrengthSlider>(main, "strength").Value = target;
+                    Pump(() => Store.Read<BridgeProfile>(path).FfbGain == target, "debounced strength save");
+                    Assert(Store.Read<BridgeProfile>(path).Bindings.Count == original.Bindings.Count, "Strength save changed mappings");
+                    Assert(Field<Label>(main, "strengthValue").Text == target + "%", "Displayed strength out of sync");
+                    Assert(Field<StrengthSlider>(main, "strength").AccessibilityObject.Value == target + "%", "Accessible strength value out of sync");
+                    main.Close();
+                }
+                Console.WriteLine("PASS Desktop: navigation, Day/Night persistence, contrast, strength display and isolated automatic saving");
+            }
+            finally { if (File.Exists(path)) File.Delete(path); if (Directory.Exists(directory)) Directory.Delete(directory); }
+        }
+        private static T Field<T>(object owner, string name) { return (T)owner.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(owner); }
         private static bool Same(byte[] left, byte[] right) { return left == null ? right == null : right != null && left.SequenceEqual(right); }
         private static T Get<T>(SetupWizard wizard, string name) { return (T)typeof(SetupWizard).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(wizard); }
         private static void Pick(ComboBox box, string id)

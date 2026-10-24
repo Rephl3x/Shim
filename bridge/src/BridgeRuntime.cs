@@ -20,16 +20,28 @@ namespace RigBridge
         private readonly ConcurrentQueue<FfbPacket> packets = new ConcurrentQueue<FfbPacket>();
         private readonly ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
         private long received;
+        private int requestedGain, appliedGain;
         private Exception callbackError;
         public Exception Error { get; private set; }
         public long Frames { get; private set; }
         public long FfbPackets { get { return Interlocked.Read(ref received); } }
+        public long WheelStarts { get; private set; }
         public string FfbStatus { get; private set; }
         public bool Running { get { return thread.IsAlive; } }
         public bool Started { get; private set; }
+        public bool IsMonitorOnly { get { return monitorOnly; } }
+        public bool CanChangeGain { get { return !monitorOnly && profile.EnableFfb && Running && !stop.WaitOne(0); } }
+        public int AppliedGain { get { return Volatile.Read(ref appliedGain); } }
+        public void UpdateGain(int value)
+        {
+            if (value < 0 || value > 100) throw new ArgumentOutOfRangeException("value");
+            if (monitorOnly || !profile.EnableFfb) throw new InvalidOperationException("FFB forwarding must be enabled to change strength live.");
+            Interlocked.Exchange(ref requestedGain, value);
+        }
         public BridgeRuntime(BridgeProfile profile, IntPtr window, bool monitorOnly)
         {
             this.profile = profile; this.window = window; this.monitorOnly = monitorOnly;
+            requestedGain = appliedGain = profile.FfbGain;
             FfbStatus = monitorOnly ? "Read-only monitor." : profile.EnableFfb ? "Waiting for game FFB packets." : "FFB forwarding is off.";
             thread = new Thread(Run) { IsBackground = true, Name = "FH Rig Bridge input and FFB" };
             thread.SetApartmentState(ApartmentState.MTA);
@@ -89,6 +101,15 @@ namespace RigBridge
                     while (!stop.WaitOne(0))
                     {
                         if (callbackError != null) throw callbackError;
+                        if (force != null)
+                        {
+                            int desired = Volatile.Read(ref requestedGain);
+                            if (force.StrengthLimit != desired)
+                            {
+                                force.SetStrength(desired); Volatile.Write(ref appliedGain, desired);
+                                messages.Enqueue("FFB strength applied live: " + desired + "%. Effects and device connections kept running.");
+                            }
+                        }
                         var current = new Dictionary<string, InputState>();
                         foreach (var reader in readers) current[reader.Info.Id] = reader.Read();
                         lock (gate) states = current;
@@ -102,6 +123,7 @@ namespace RigBridge
                         }
                         if (force != null)
                         {
+                            WheelStarts = force.Starts;
                             FfbStatus = FfbPackets == 0 ? "Waiting for game FFB packets. Launch/restart Forza after the bridge." : force.Status;
                             if (diagnosticClock.ElapsedMilliseconds >= 5000)
                             {

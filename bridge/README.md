@@ -1,8 +1,16 @@
-# FH Rig Bridge 0.2.2
+# FH Rig Bridge 0.3.0
 
 Our Windows app combines physical racing controls into one virtual force-feedback controller. It contains our own DirectInput reader, input mapper, vJoy force-feedback packet decoder, and DirectInput effect forwarding code. It does not run Forza EmuWheel, UCR, or another mapper.
 
-This build adds guided first-run setup. Physical input reading has been checked with the connected MOZA R21, HGP, Saitek panel and USB gamepad. Automated tests cover setup, calibration, the mapper, FFB protocol and hiding recovery. **Virtual output, actual motor forces and Forza Horizon 6 compatibility still need hands-on verification.**
+Version 0.3.0 adds a cleaner Drive dashboard, separate Mappings/Live inputs/Drivers/Activity pages, saved Day/Night mode across the main window and setup wizard, and live FFB strength adjustment. User testing confirmed working controls and FFB in Forza on the MOZA rig with 0.2.2. Existing device mappings and calibration remain compatible.
+
+## Everyday controls
+
+- **Drive** keeps start/stop, your included devices, FFB packet/start counters and strength together. Move the strength slider while the bridge is running: the worker changes the wheel's gain without resetting effects, vJoy or device connections. The game's own gain still multiplies this limit; game mute/pause is respected. Strength saves automatically after you finish adjusting it. 0% mutes force while retaining the active effects; raising it restores the same effects. Before starting, the slider sets the strength for the next session.
+- **Day / Night** at the top right changes the appearance immediately and remembers your choice. The wizard uses the same setting. Appearance changes do not reconnect devices.
+- **Mappings** contains device selection, read-only input monitoring, learning and manual profile saves. **Live inputs** shows readings. **Drivers** contains driver health and connection settings. **Activity** contains detailed session/FFB logs.
+
+The strength slider supports mouse dragging, arrow keys in 1% steps, Page Up/Down in 5% steps and Home/End. Its current percentage is exposed to accessibility clients. Enabling/disabling forwarding, changing the target wheel or changing force inversion still requires stopping the bridge.
 
 Version 0.2.1 fixes the false **HidHide returned an oversized response** error when starting or restoring a session. HidHide list writes report bytes consumed despite having no output buffer; those acknowledgements are now handled separately from reads. List reads query the required size and retry if it changes. Recovery verifies the actual driver state before clearing its record. Restore visibility also works in the same app window after its bridge worker has stopped. Profiles and calibration remain compatible.
 
@@ -39,12 +47,12 @@ The installers' Windows signatures were verified during packaging. The bridge EX
 
 ## Advanced mapping (optional after the wizard)
 
-1. In **Devices and mappings**, tick the physical controllers you want merged/hidden. Include other connected controllers that could compete with the virtual wheel in Forza. Unselected physical controllers remain visible to the game.
+1. In **Mappings**, tick the physical controllers you want merged/hidden. Include other connected controllers that could compete with the virtual wheel in Forza. Unselected physical controllers remain visible to the game.
 2. Click **Monitor inputs**. This mode reads selected controllers without hiding devices, writing to vJoy, or sending FFB commands. **Live inputs** shows axes and pressed button numbers.
-3. Choose **Steering (X)** in the output selector and click **Learn selected output**. Turn the physical wheel far enough to change its normalized value by more than 0.15. The first qualifying input is assigned. Learn throttle, brake, clutch and handbrake the same way. Return other controls to rest while learning.
+3. Choose **Steering (X)** in the output selector and click **Learn control**. Turn the physical wheel far enough to change its normalized value by more than 0.15. The first qualifying input is assigned. Learn throttle, brake, clutch and handbrake the same way. Return other controls to rest while learning.
 4. Use **Invert axis** if a pedal reports the opposite direction. Choose the deadzone before learning. To change those options for an existing mapping, learn that output again. Steering deadzone is centered; pedal deadzone is applied at the released end.
-5. Click **Stop / restore devices** to stop monitoring. Click **Map all buttons** to assign physical buttons to virtual buttons. HGP inputs are assigned first, other accessories next, and the FFB wheel last. There are 128 virtual button outputs. If the hardware declares more, the app tells you how many were left unmapped. Use Learn with a specific Button output to replace an unwanted assignment with a needed control. You can also learn POV hats.
-6. Choose the R21 under **FFB wheel**. Initially leave FFB off, save the profile and verify all virtual inputs first. For the force test, enable **Forward game force feedback** and start with a low gain; the default cap is **25%**. This caps the game's device gain; it is not a calibrated torque measurement.
+5. Click **Stop bridge** to stop monitoring. **Auto-map buttons** replaces the manual button map with physical buttons, with HGP inputs first. There are 128 virtual button outputs. The setup wizard reserves explicitly learned gears and distributes remaining slots across devices; use it for a full rig setup. You can also learn individual buttons and POV hats manually.
+6. Choose the R21 under **Drivers → FFB wheel**. On Drive, enable **Forward game force feedback** and choose a strength. New profiles default to **25%**. This caps the game's device gain; it is not a calibrated torque measurement.
 
 **Steering and the FFB destination must be the same physical wheel.** A selected device with no mapped controls is hidden during bridging but contributes no inputs. The app never invents H-pattern gear pulses: a physical gear button stays pressed only while the corresponding input is pressed.
 
@@ -56,9 +64,11 @@ The output axis names are our suggested assignments. Bind those virtual axes and
 2. Launch Forza. The selected physical HID inputs are hidden; the virtual vJoy controller remains visible. Create a custom wheel profile and bind its axes, individual gears and buttons once.
 3. Confirm steering, pedals and every H-pattern gear. Then test FFB at a low gain. The app's **FFB packets received** counter shows whether the game is sending feedback to the virtual device.
 4. Keep the bridge running while playing. On later launches, load the same profile, start the bridge, then launch Forza. Keeping a stable virtual device and hiding its physical sources removes competition between those selected physical sources for Device 1. Other unhidden controllers can still affect enumeration.
-5. Click **Stop / restore devices** when done. Restart Forza before switching between the virtual rig and native physical-device profiles. An already running game may retain handles it opened before hiding was enabled.
+5. Click **Stop bridge** when done. Restart Forza before switching between the virtual rig and native physical-device profiles. An already running game may retain handles it opened before hiding was enabled.
 
 **After an FFB error or bridge stop/restart, close and restart Forza after the bridge is running.** Stopping resets vJoy and removes the game's effects. An already-running game can keep steering working without recreating its force effects.
+
+Changing the strength slider or Day/Night mode does not stop the bridge and does not require restarting Forza.
 
 The status line separates incoming **FFB packets** from **wheel effects created / updates / starts accepted**, and shows effective gain and game mute/pause state. These counters confirm accepted software/driver calls; they do not measure motor torque. Session logs record the first report of each type, a five-second FFB summary, and final totals, so a later restart with no effect definitions is distinguishable from a physical-driver update failure. Zero packets means the game has not sent FFB to this vJoy session. Packets with no starts mean playback has not been requested/accepted yet; restart the game after the bridge if it retained old effects. Gain 0%, muted or paused state can also explain no force.
 
@@ -98,6 +108,7 @@ Keep the app in the same folder once configured. These files are stored per Wind
 
 ```text
 %LOCALAPPDATA%\FHRigBridge\profile.json
+%LOCALAPPDATA%\FHRigBridge\appearance.json
 %LOCALAPPDATA%\FHRigBridge\setup-draft.json
 %LOCALAPPDATA%\FHRigBridge\profile-before-setup-*.json
 %LOCALAPPDATA%\FHRigBridge\hiding-recovery.json
@@ -116,9 +127,9 @@ From the extracted source/package root, use Windows PowerShell:
 .\PackageBridge.ps1
 ```
 
-The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\FH-Rig-Bridge-0.2.2.zip`. All three scripts accept `-OutputDirectory` to build a new release beside an open older copy, for example `PackageBridge.ps1 -OutputDirectory .\dist\bridge-0.2.2`.
+The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\FH-Rig-Bridge-0.3.0.zip`. All three scripts accept `-OutputDirectory` to build a new release beside an open older copy, for example `PackageBridge.ps1 -OutputDirectory .\dist\bridge-0.3.0`.
 
-An optional desktop smoke check uses a connected FFB wheel for read-only input polling and exercises the real WinForms wizard, including back navigation, required-control validation, final readiness, cancellation and resume. It restores any previous setup draft and checks that the active profile stayed unchanged:
+An optional desktop smoke check exercises main-window navigation, Day/Night changes, strength display and automatic saving to an isolated temporary profile. It also uses a connected FFB wheel for read-only wizard input polling, including back navigation, required-control validation, final readiness, cancellation and resume. Previous appearance preferences/setup drafts are restored, and the active profile must remain unchanged:
 
 ```powershell
 .\dist\bridge\FH-Rig-Bridge.Tests.exe --desktop
@@ -129,15 +140,18 @@ Read-only diagnostics and offscreen UI preview:
 ```powershell
 .\FH-Rig-Bridge.exe --diagnose C:\Temp\rig-report.json
 .\FH-Rig-Bridge.exe --preview C:\Temp\rig-preview.png
+.\FH-Rig-Bridge.exe --preview C:\Temp\rig-night.png Night
+.\FH-Rig-Bridge.exe --preview C:\Temp\mappings-night.png Night Mappings
 .\FH-Rig-Bridge.exe --preview-wizard C:\Temp\wizard-preview.png 2
+.\FH-Rig-Bridge.exe --preview-wizard C:\Temp\wizard-night.png 2 Night
 ```
 
 With the bridge stopped, `FH-Rig-Bridge.exe --check-ffb-update C:\Temp\ffb-update-report.json` creates/updates/frees constant and spring effects at **zero gain without any effect Start calls**. It opens the profile's physical FFB wheel exclusively, checks gain/autocentre restoration and does not start the bridge, hide devices, or write vJoy inputs. This validates driver interoperability; it is not a motor-force test.
 
 To recover a stopped session without opening the UI, run `FH-Rig-Bridge.exe --restore-visibility C:\Temp\visibility-report.json`. It applies the saved session rollback and records before/after state; it refuses to recover a session owned by another running process. The driver control handle is closed between snapshot, recovery and verification because HidHide allows one control client at a time.
 
-Diagnostics include controller instance identifiers; review before sharing. Preview mode disables driver setup, bridge start and visibility recovery. Wizard preview takes a page index from 0 to 5. Neither mode sends motor forces or saves a profile.
+Diagnostics include controller instance identifiers; review before sharing. Preview mode disables driver setup, bridge start and visibility recovery. Wizard preview takes a page index from 0 to 5. Previews do not send motor forces or save profile/appearance preferences.
 
-Validation: 84 automated checks cover setup, mapping, FFB and recovery, including the exact already-initialized failure through a simulated physical driver, changed-field updates, playback-preserving fallback and native adapter/packet integration. The desktop smoke flow uses read-only R21 polling. The physical R21 accepted two effect creations and three updates (constant magnitude in both directions and spring condition updates) at zero gain with **zero Start calls**; gain/autocentre readback matched their original values. Native HidHide recovery was also verified in 0.2.1. All six wizard screens and the main window were rendered for inspection. Both bundled installers and the SDK DLL have valid publisher signatures. In-game motor feedback remains a hands-on test.
+Validation: 88 automated checks cover setup, mapping, FFB and recovery, including live strength changes that preserve effect objects/playback, respect game gain/mute/pause, and leave unrelated profile edits unsaved. Day/Night palettes pass body/muted-text contrast checks. Desktop checks cover the redesigned navigation, theme persistence, accessible strength display, automatic isolated-profile saving and theme changes while wizard monitoring stays running. Day/Night previews were inspected for the dashboard, mappings, drivers and wizard. The R21 accepted zero-gain native effect creation/update checks in 0.2.2, and the user subsequently confirmed working in-game FFB. The 0.3.0 development checks do not play motor forces or change driver configuration.
 
 API references: [Microsoft DirectInput](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ee418998(v=vs.85)), [effect parameters](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ee416616(v=vs.85)), [vJoy SDK](https://github.com/BrunnerInnovation/vJoy), [vJoy configuration command source](https://github.com/BrunnerInnovation/vJoy/blob/v2.2.2.0/apps/vJoyConf/vJoyConfig/vJoyConfig.cpp), [HidHide](https://github.com/nefarius/HidHide).

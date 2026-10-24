@@ -133,6 +133,13 @@ namespace RigBridge
         public static string DirectoryPath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FHRigBridge"); } }
         public static string ProfilePath { get { return Path.Combine(DirectoryPath, "profile.json"); } }
         public static string RecoveryPath { get { return Path.Combine(DirectoryPath, "hiding-recovery.json"); } }
+        public static void SaveStrength(string path, int value, BridgeProfile fallback)
+        {
+            if (value < 0 || value > 100) throw new ArgumentOutOfRangeException("value");
+            var saved = File.Exists(path) ? Read<BridgeProfile>(path) : SetupLogic.Clone(fallback);
+            if (saved == null) throw new InvalidDataException("The saved profile could not be read.");
+            saved.FfbGain = value; Write(path, saved);
+        }
         public static T Read<T>(string path) { return new JavaScriptSerializer().Deserialize<T>(File.ReadAllText(path, Encoding.UTF8)); }
         public static void Write(string path, object value)
         {

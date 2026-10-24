@@ -21,8 +21,9 @@ namespace RigBridge
         private readonly Label steps = new Label { AutoSize = true, ForeColor = Color.FromArgb(50, 99, 166) };
         private readonly Label heading = new Label { AutoSize = true, Font = new Font("Segoe UI", 23, FontStyle.Bold) };
         private readonly Label message = new Label { Dock = DockStyle.Fill, ForeColor = Color.FromArgb(166, 56, 25), AutoEllipsis = true };
-        private readonly Panel body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.White, Padding = new Padding(20) };
+        private readonly Panel body = new SurfaceCard { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(22) };
         private readonly Button back = MakeButton("Back"), next = MakeButton("Next"), cancel = MakeButton("Save progress and close");
+        private readonly Button themeDay = MakeButton("Day"), themeNight = MakeButton("Night");
         private readonly ComboBox wheel = Choice(), pedals = Choice(), shifter = Choice(), sequential = Choice(), handbrake = Choice();
         private readonly CheckBox clutch = Check("My pedals include a clutch"), reverse = Check("Include reverse gear"), automatic = Check("Automatically include remaining buttons and hat switches");
         private readonly NumericUpDown gears = new NumericUpDown { Minimum = 1, Maximum = 10, Value = 7, Width = 65 };
@@ -55,22 +56,31 @@ namespace RigBridge
 
         public SetupWizard(BridgeProfile current, IList<PhysicalDevice> found, string previewPath, int previewStep)
         {
+            Appearance.Load();
             original = SetupLogic.Clone(current); draft = SetupLogic.Clone(current);
             this.previewPath = previewPath; this.previewStep = previewStep; preview = previewPath != null;
             devices = found.Where(d => !d.Virtual).ToList();
             Text = "FH Rig Bridge - set up your rig"; Font = new Font("Segoe UI", 10); BackColor = Color.FromArgb(243, 246, 250);
             ClientSize = new Size(1000, 790); MinimumSize = new Size(920, 740); AutoScaleMode = AutoScaleMode.Dpi; StartPosition = FormStartPosition.CenterParent;
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 1, RowCount = 5 };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 65));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 65)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
-            layout.Controls.Add(steps, 0, 0); layout.Controls.Add(heading, 0, 1); layout.Controls.Add(body, 0, 2); layout.Controls.Add(message, 0, 3);
+            var top = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
+            top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); top.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 166));
+            steps.Tag = "Accent"; steps.Font = new Font("Segoe UI Semibold", 9); top.Controls.Add(steps, 0, 0);
+            themeDay.AutoSize = themeNight.AutoSize = false; themeDay.MinimumSize = themeNight.MinimumSize = new Size(72, 32); themeDay.Size = themeNight.Size = new Size(72, 32);
+            themeDay.Margin = themeNight.Margin = new Padding(0, 0, 8, 0);
+            var modes = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Margin = new Padding(0) }; modes.Controls.AddRange(new Control[] { themeDay, themeNight }); top.Controls.Add(modes, 1, 0);
+            layout.Controls.Add(top, 0, 0); layout.Controls.Add(heading, 0, 1); layout.Controls.Add(body, 0, 2); layout.Controls.Add(message, 0, 3);
             var footer = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft };
-            next.BackColor = Color.FromArgb(30, 99, 182); next.ForeColor = Color.White; next.FlatStyle = FlatStyle.Flat;
+            next.Tag = "Primary"; cancel.Tag = "Ghost"; message.Tag = "Danger";
             footer.Controls.AddRange(new Control[] { next, back, cancel }); layout.Controls.Add(footer, 0, 4); Controls.Add(layout);
             back.Click += (s, e) => { if (!navigating) { StopMonitor(); ShowPage(page - 1); } };
             next.Click += async (s, e) => await NextAsync(); cancel.Click += (s, e) => Close();
             capture.Click += (s, e) => CaptureControl(); retry.Click += (s, e) => ResetCapture();
             controls.SelectedIndexChanged += (s, e) => ResetCapture();
+            themeDay.Click += (s, e) => SetMode("Day"); themeNight.Click += (s, e) => SetMode("Night");
+            Appearance.Changed += ApplyAppearance;
             slot.ValueChanged += (s, e) => { draft.VirtualId = (uint)slot.Value; driverStatus = null; UpdateDriverText(); };
             timer.Tick += (s, e) => Tick(); timer.Start();
             Shown += async (s, e) => {
@@ -89,10 +99,17 @@ namespace RigBridge
                 StopMonitor();
                 if (!preview && Result == null && page > 0) { try { SaveDraft(); } catch (Exception ex) { message.Text = "Could not save setup progress: " + ex.Message; } }
             };
-            FormClosed += (s, e) => timer.Dispose();
+            FormClosed += (s, e) => { timer.Dispose(); Appearance.Changed -= ApplyAppearance; };
             if (preview) { ShowInTaskbar = false; StartPosition = FormStartPosition.Manual; Location = new Point(-20000, -20000); }
+            ApplyAppearance();
         }
-        private static Button MakeButton(string text) { return new Button { Text = text, AutoSize = true, MinimumSize = new Size(110, 38), Padding = new Padding(9, 4, 9, 4), Margin = new Padding(0, 4, 10, 4) }; }
+        private static Button MakeButton(string text) { return new ModernButton { Text = text, AutoSize = true, MinimumSize = new Size(110, 40), Padding = new Padding(12, 5, 12, 5), Margin = new Padding(0, 4, 10, 4) }; }
+        private void SetMode(string mode) { try { Appearance.Set(mode, !preview); } catch (Exception ex) { message.Text = "Appearance could not be saved: " + ex.Message; } }
+        private void ApplyAppearance()
+        {
+            themeDay.Tag = Appearance.Mode == "Day" ? "Active" : "Ghost"; themeNight.Tag = Appearance.Mode == "Night" ? "Active" : "Ghost";
+            Appearance.Apply(this);
+        }
         private static ComboBox Choice() { return new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 580 }; }
         private static CheckBox Check(string text) { return new CheckBox { Text = text, AutoSize = true, Margin = new Padding(0, 8, 0, 8) }; }
         private static Label Copy(string text) { return new Label { Text = text, AutoSize = true, MaximumSize = new Size(840, 0), Margin = new Padding(0, 4, 0, 12) }; }
@@ -104,7 +121,7 @@ namespace RigBridge
             page = Math.Max(0, Math.Min(5, value)); armed = false; message.Text = "";
             body.Controls.Clear(); body.AutoScrollPosition = Point.Empty;
             string[] titles = { "Let's set up your rig", "Drivers and virtual wheel", "Which devices make up your rig?", "Teach the bridge your controls", "Choose force feedback", "Check your inputs and save" };
-            steps.Text = "STEP " + (page + 1) + " OF 6     /     " + String.Join("   >   ", new[] { "Welcome", "Drivers", "Devices", "Controls", "Feedback", "Finish" }); heading.Text = titles[page];
+            steps.Text = "RIG SETUP / STEP " + (page + 1) + " OF 6"; heading.Text = titles[page];
             back.Enabled = page > 0; next.Text = page == 5 ? "Finish setup" : "Next"; next.Enabled = !preview;
             var content = Stack(); body.Controls.Add(content);
             if (page == 0)
@@ -176,6 +193,7 @@ namespace RigBridge
                 StartMonitor(); if (!preview) BeginInvoke(new Action(async () => await CheckAsync()));
                 UpdateFinish();
             }
+            ApplyAppearance();
         }
         private void SetRoleControls()
         {

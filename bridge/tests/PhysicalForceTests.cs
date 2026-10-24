@@ -9,6 +9,30 @@ namespace RigBridge.Tests
     {
         public static void Run(Action<string, Action> test)
         {
+            test("Live strength preserves active effects and multiplies the game's gain", () => {
+                var device = new FakeDevice();
+                using (var sink = new NativeForceSink(device, 25, false, 2))
+                {
+                    var source = Constant(); sink.Update(source); sink.Start(1, UInt32.MaxValue, false); sink.Gain(5000);
+                    var commands = device.Commands.ToArray(); var effect = device.Effects.Single();
+                    sink.SetStrength(60);
+                    Assert(device.Properties[7] == 3000 && sink.StrengthLimit == 60, "New strength did not retain the game's gain");
+                    Assert(device.Commands.SequenceEqual(commands) && device.Effects.Count == 1 && effect.Starts == 1 && effect.Stops == 0 && effect.Unloads == 0 && effect.UpdateFlags.Count == 0, "Live strength reset, recreated, restarted, or stopped an effect");
+                    sink.Gain(2000); Assert(device.Properties[7] == 1200, "A later game gain bypassed the live strength");
+                    sink.SetStrength(0); Assert(device.Properties[7] == 0 && sink.ActuatorsEnabled && effect.Starts == 1, "Zero strength destroyed playback");
+                    sink.SetStrength(100); Assert(device.Properties[7] == 2000 && effect.Starts == 1, "Restoring strength did not resume the same effect");
+                }
+            });
+            test("Live strength respects game mute and pause state", () => {
+                var device = new FakeDevice();
+                using (var sink = new NativeForceSink(device, 25, false, 2))
+                {
+                    sink.Control(2); sink.Control(5); var commands = device.Commands.ToArray(); sink.SetStrength(45);
+                    Assert(!sink.ActuatorsEnabled && sink.Paused && device.Commands.SequenceEqual(commands), "Strength unmuted or unpaused the game");
+                    bool rejected = false; try { sink.SetStrength(101); } catch (ArgumentOutOfRangeException) { rejected = true; }
+                    Assert(rejected && sink.StrengthLimit == 45 && device.Properties[7] == 4500, "Invalid strength reached the driver");
+                }
+            });
             test("MOZA updates exclude immutable axes and change only magnitude", () => {
                 var device = new FakeDevice();
                 using (var sink = new NativeForceSink(device, 25, false, 0x01000002))
@@ -134,7 +158,7 @@ namespace RigBridge.Tests
         }
         private sealed class FakeEffect : IPhysicalForceEffect
         {
-            public readonly List<uint> UpdateFlags = new List<uint>(); public int[] Parameters; public bool EnvelopePresent, Disposed, RejectNextDynamic; public long Starts; public uint Iterations; public int NextError;
+            public readonly List<uint> UpdateFlags = new List<uint>(); public int[] Parameters; public bool EnvelopePresent, Disposed, RejectNextDynamic; public long Starts; public int Stops, Unloads; public uint Iterations; public int NextError;
             public void Capture(DiEffectDescription description) { Parameters = new int[description.TypeSize / 4]; Marshal.Copy(description.TypeData, Parameters, 0, Parameters.Length); EnvelopePresent = description.Envelope != IntPtr.Zero; }
             public int SetParameters(ref DiEffectDescription description, uint flags)
             {
@@ -145,7 +169,7 @@ namespace RigBridge.Tests
                 Capture(description); return 0;
             }
             public int Start(uint iterations, uint flags) { Starts++; Iterations = iterations; return 0; }
-            public int Stop() { return 0; } public int Unload() { return 0; }
+            public int Stop() { Stops++; return 0; } public int Unload() { Unloads++; return 0; }
             public void Dispose() { Disposed = true; }
         }
     }

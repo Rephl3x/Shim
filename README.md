@@ -2,6 +2,8 @@
 
 Forza Motorsport/Horizon Adapter for Force Feedback
 
+The newer **FH Rig Bridge 0.3.0** combines physical controls into one virtual wheel using our own mapper and FFB bridge, with official vJoy/HidHide installers bundled. It includes guided setup, a cleaner Drive dashboard, saved Day/Night mode and live FFB strength adjustment without resetting the bridge. See [the bridge guide](bridge/README.md). Build/package it with `BuildBridge.ps1 -Test` and `PackageBridge.ps1`. The reconnect utility below remains a separate tool.
+
 A portable Windows utility that disconnects selected USB game controllers and reconnects them in your chosen order. Put the wheel base first to try the MOZA / Forza Horizon 6 force-feedback workaround without crawling behind the PC.
 
 **This is an experimental reconnect workaround. It cannot guarantee that Forza will assign the wheel to Device 1.** Device disable/enable is a logical reconnect, not a physical USB power cycle. Windows, drivers, and the game can retain their own device ordering. You must verify Device 1 and force feedback in the game.

@@ -337,8 +337,34 @@ namespace RigBridge.Tests
                 try { Store.Write(path, Profile()); var copy = Store.Read<BridgeProfile>(path); copy.FfbGain = 40; Store.Write(path, copy); Assert(Store.Read<BridgeProfile>(path).FfbGain == 40, "Atomic replacement lost state"); }
                 finally { if (File.Exists(path)) File.Delete(path); if (File.Exists(path + ".tmp")) File.Delete(path + ".tmp"); if (Directory.Exists(directory)) Directory.Delete(directory); }
             });
+            Test("Saving strength preserves stored mappings instead of saving unrelated UI edits", () => {
+                string directory = Path.Combine(Path.GetTempPath(), "FHRigBridge-gain-" + Guid.NewGuid().ToString("N")); string path = Path.Combine(directory, "profile.json");
+                try
+                {
+                    var saved = Profile(); saved.VirtualId = 3; saved.EnableFfb = true; saved.FfbDevice = "wheel"; saved.SetupVersion = 1; Store.Write(path, saved);
+                    var editing = SetupLogic.Clone(saved); editing.Bindings.Clear(); editing.VirtualId = 8;
+                    Store.SaveStrength(path, 63, editing); var actual = Store.Read<BridgeProfile>(path);
+                    Assert(actual.FfbGain == 63 && actual.VirtualId == 3 && actual.Bindings.Count == 1 && actual.EnableFfb && actual.SetupVersion == 1, "Live save overwrote unrelated profile state");
+                    Throws(() => Store.SaveStrength(path, 101, editing)); Assert(Store.Read<BridgeProfile>(path).FfbGain == 63, "Invalid gain altered disk profile");
+                }
+                finally { if (File.Exists(path)) File.Delete(path); if (Directory.Exists(directory)) Directory.Delete(directory); }
+            });
+            Test("Day and Night palettes keep body and muted text readable", () => {
+                foreach (string mode in new[] { "Day", "Night" })
+                {
+                    var palette = Palette.For(mode);
+                    Assert(Contrast(palette.Text, palette.Surface) >= 4.5 && Contrast(palette.Muted, palette.Surface) >= 4.5, mode + " text contrast too low");
+                    Assert(Contrast(palette.Text, palette.Input) >= 4.5 && palette.Night == (mode == "Night"), "Input contrast or mode mismatch");
+                }
+            });
         }
         private static Binding Axis(string device, int source, int target) { return new Binding { DeviceId = device, InputKind = "Axis", InputIndex = source, OutputKind = "Axis", OutputIndex = target }; }
+        private static double Luminance(System.Drawing.Color color)
+        {
+            Func<byte, double> channel = value => { double part = value / 255.0; return part <= 0.04045 ? part / 12.92 : Math.Pow((part + 0.055) / 1.055, 2.4); };
+            return 0.2126 * channel(color.R) + 0.7152 * channel(color.G) + 0.0722 * channel(color.B);
+        }
+        private static double Contrast(System.Drawing.Color a, System.Drawing.Color b) { double x = Luminance(a), y = Luminance(b); return (Math.Max(x, y) + 0.05) / (Math.Min(x, y) + 0.05); }
         private static VirtualStatus ReadyVirtual() { return new VirtualStatus { Slot = 1, Enabled = true, Match = true, State = 1, Axes = Enumerable.Repeat(true, 8).ToArray(), Buttons = 128, Hats = 4, Ffb = true, Effects = 11 }; }
         private static List<PhysicalDevice> SetupDevices()
         {
