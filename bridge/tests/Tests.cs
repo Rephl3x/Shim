@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -237,6 +238,72 @@ namespace RigBridge.Tests
                     Assert(driver.Black.SequenceEqual(new[] { "HID\\EXISTING" }) && driver.White.SequenceEqual(new[] { "EXISTING_APP" }) && driver.Active, "Existing rules were lost");
                 }
             });
+            Test("Native HidHide write acknowledgements are not treated as output data", () => {
+                var io = new FakeHideControl();
+                using (var driver = new HideDriver(io.Send))
+                {
+                    driver.SetList(2049, new[] { "OUR_APP" }); driver.SetList(2051, new[] { "HID\\WHEEL" }); driver.SetFlag(2053, true);
+                    Assert(driver.GetList(2048).SequenceEqual(new[] { "OUR_APP" }) && driver.GetList(2050).SequenceEqual(new[] { "HID\\WHEEL" }) && driver.GetFlag(2052), "Acknowledged writes did not persist");
+                    Assert(io.WritesWithoutOutput == 3, "Setter used an output buffer");
+                }
+            });
+            Test("Real HidHide adapter can apply and restore with input-length write replies", () => {
+                var io = new FakeHideControl(); io.White.Add("OTHER_APP");
+                using (var driver = new HideDriver(io.Send))
+                {
+                    var recovery = HideSession.Prepare(driver, new[] { "HID\\WHEEL", "HID\\HGP" }, "OUR_APP", null);
+                    HideSession.Apply(driver, recovery); Assert(io.Active && io.Black.Count == 2 && io.White.Count == 2, "Apply did not complete");
+                    HideSession.Restore(driver, recovery);
+                    Assert(!io.Active && io.Black.Count == 0 && io.White.SequenceEqual(new[] { "OTHER_APP" }), "Adapter rollback failed");
+                    HideSession.Restore(driver, recovery); Assert(!io.Active && io.White.SequenceEqual(new[] { "OTHER_APP" }), "Rollback is not idempotent");
+                }
+            });
+            Test("Native adapter recovers a partial whitelist-only session", () => {
+                var io = new FakeHideControl(); io.White.Add("OTHER_APP");
+                using (var driver = new HideDriver(io.Send))
+                {
+                    var recovery = HideSession.Prepare(driver, new[] { "HID\\WHEEL" }, "OUR_APP", null);
+                    driver.SetList(2049, io.White.Concat(recovery.AddedApplications));
+                    HideSession.Restore(driver, recovery);
+                    Assert(io.Black.Count == 0 && io.White.SequenceEqual(new[] { "OTHER_APP" }) && !io.Active, "Partial write left stale rules");
+                }
+            });
+            Test("HidHide list reads query their size and handle more than the old fixed capacity", () => {
+                var io = new FakeHideControl(); io.White.Add(new string('a', 70000));
+                using (var driver = new HideDriver(io.Send))
+                {
+                    Assert(driver.GetList(2048).Single().Length == 70000 && io.SizeQueries == 1, "List was truncated or size was not queried");
+                    Assert(driver.GetList(2050).Count == 0, "Empty list rejected");
+                }
+            });
+            Test("HidHide list growth between query and read is retried", () => {
+                var io = new FakeHideControl { GrowNextRead = true };
+                using (var driver = new HideDriver(io.Send))
+                    Assert(driver.GetList(2050).SequenceEqual(new[] { "HID\\CONCURRENT" }) && io.SizeQueries == 2, "List growth was not retried");
+            });
+            Test("HidHide rejects implausible sizes before allocating output memory", () => {
+                using (var odd = new HideDriver((function, input, output) => 3)) Throws(() => odd.GetList(2050));
+                using (var oversized = new HideDriver((function, input, output) => UInt32.MaxValue)) Throws(() => oversized.GetList(2048));
+            });
+            Test("HidHide still checks actual read buffer lengths", () => {
+                using (var oversized = new HideDriver((function, input, output) => 2)) Throws(() => oversized.GetFlag(2052));
+                using (var empty = new HideDriver((function, input, output) => 0)) Throws(() => empty.GetFlag(2054));
+            });
+            Test("HidHide write failures still propagate", () => {
+                using (var driver = new HideDriver((function, input, output) => { throw new Win32Exception(5, "Denied"); }))
+                { Throws(() => driver.SetList(2049, new[] { "OUR_APP" })); Throws(() => driver.SetFlag(2053, true)); }
+            });
+            Test("HidHide refuses to report recovery success if acknowledged writes were ignored", () => {
+                var io = new FakeHideControl();
+                using (var driver = new HideDriver(io.Send))
+                {
+                    var recovery = HideSession.Prepare(driver, new[] { "HID\\WHEEL" }, "OUR_APP", null);
+                    HideSession.Apply(driver, recovery); io.IgnoreWrites = true;
+                    Throws(() => HideSession.Restore(driver, recovery));
+                    Assert(io.Black.Contains("HID\\WHEEL") && io.White.Contains("OUR_APP"), "Test did not retain rules");
+                    io.IgnoreWrites = false; HideSession.Restore(driver, recovery); Assert(io.Black.Count == 0 && !io.Active, "Retry failed");
+                }
+            });
             Test("An initially inactive empty configuration becomes inactive again", () => {
                 using (var driver = new FakeHide()) { var recovery = HideSession.Prepare(driver, new[] { "HID\\WHEEL" }, "OUR_APP", null); HideSession.Apply(driver, recovery); HideSession.Restore(driver, recovery); Assert(!driver.Active && driver.Black.Count == 0 && driver.White.Count == 0, "Original visibility not restored"); }
             });
@@ -255,6 +322,15 @@ namespace RigBridge.Tests
                 Assert(HideDriver.EncodeMultiString(new string[0]).Length == 4, "Empty MULTI_SZ missing terminators");
             });
             Test("Recovery does not trust a reused process ID", () => { using (var process = Process.GetCurrentProcess()) Assert(!HideSession.ParentIsAlive(new HideRecovery { ProcessId = process.Id, ProcessStartTicks = 1 }), "PID reuse ignored"); });
+            Test("An idle owning UI can recover its stopped worker without closing the app", () => {
+                using (var process = Process.GetCurrentProcess())
+                {
+                    var recovery = new HideRecovery { ProcessId = process.Id, ProcessStartTicks = process.StartTime.ToUniversalTime().Ticks };
+                    Assert(!HideSession.CanRecover(recovery, false), "A live worker was allowed recovery");
+                    Assert(HideSession.CanRecover(recovery, true), "An explicitly stopped owning worker was blocked");
+                    recovery.ProcessStartTicks = 1; Assert(HideSession.CanRecover(recovery, false), "An old session with a reused PID could not recover");
+                }
+            });
             Test("Profile and hiding recovery records survive atomic replacement", () => {
                 string directory = Path.Combine(Path.GetTempPath(), "FHRigBridge-tests-" + Guid.NewGuid().ToString("N")); string path = Path.Combine(directory, "state.json");
                 try { Store.Write(path, Profile()); var copy = Store.Read<BridgeProfile>(path); copy.FfbGain = 40; Store.Write(path, copy); Assert(Store.Read<BridgeProfile>(path).FfbGain == 40, "Atomic replacement lost state"); }
@@ -300,6 +376,35 @@ namespace RigBridge.Tests
             public bool GetFlag(int function) { return function == 2054 ? Inverse : Active; }
             public void SetFlag(int function, bool value) { if (function == 2053) Active = value; else Inverse = value; }
             public void Dispose() { }
+        }
+        private sealed class FakeHideControl
+        {
+            public List<string> White = new List<string>(), Black = new List<string>();
+            public bool Active, Inverse, GrowNextRead, IgnoreWrites;
+            public int SizeQueries, WritesWithoutOutput;
+            public uint Send(int function, byte[] input, byte[] output)
+            {
+                if (input != null)
+                {
+                    Assert(output == null, "Write must not request output"); WritesWithoutOutput++;
+                    if (!IgnoreWrites)
+                    {
+                        if (function == 2049) White = HideDriver.DecodeMultiString(input);
+                        else if (function == 2051) Black = HideDriver.DecodeMultiString(input);
+                        else if (function == 2053) Active = input[0] != 0;
+                        else if (function == 2055) Inverse = input[0] != 0;
+                        else throw new InvalidOperationException("Unexpected setter");
+                    }
+                    return (uint)input.Length; // The driver reports consumed input bytes with no output buffer.
+                }
+                if (function == 2052 || function == 2054) { output[0] = (byte)((function == 2052 ? Active : Inverse) ? 1 : 0); return 1; }
+                var entries = function == 2048 ? White : Black;
+                if (output == null) { SizeQueries++; return (uint)HideDriver.EncodeMultiString(entries).Length; }
+                if (GrowNextRead) { GrowNextRead = false; entries.Add("HID\\CONCURRENT"); }
+                byte[] data = HideDriver.EncodeMultiString(entries);
+                if (output.Length < data.Length) throw new Win32Exception(122, "Insufficient buffer");
+                Array.Copy(data, output, data.Length); return (uint)data.Length;
+            }
         }
     }
 }

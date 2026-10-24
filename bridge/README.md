@@ -1,8 +1,10 @@
-# FH Rig Bridge 0.2
+# FH Rig Bridge 0.2.1
 
 Our Windows app combines physical racing controls into one virtual force-feedback controller. It contains our own DirectInput reader, input mapper, vJoy force-feedback packet decoder, and DirectInput effect forwarding code. It does not run Forza EmuWheel, UCR, or another mapper.
 
 This build adds guided first-run setup. Physical input reading has been checked with the connected MOZA R21, HGP, Saitek panel and USB gamepad. Automated tests cover setup, calibration, the mapper, FFB protocol and hiding recovery. **Virtual output, actual motor forces and Forza Horizon 6 compatibility still need hands-on verification.**
+
+Version 0.2.1 fixes the false **HidHide returned an oversized response** error when starting or restoring a session. HidHide list writes report bytes consumed despite having no output buffer; those acknowledgements are now handled separately from reads. List reads query the required size and retry if it changes. Recovery verifies the actual driver state before clearing its record. Restore visibility also works in the same app window after its bridge worker has stopped. Profiles and calibration remain compatible.
 
 ## What is in the package
 
@@ -108,7 +110,7 @@ From the extracted source/package root, use Windows PowerShell:
 .\PackageBridge.ps1
 ```
 
-The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\FH-Rig-Bridge-0.2.0.zip`.
+The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\FH-Rig-Bridge-0.2.1.zip`.
 
 An optional desktop smoke check uses a connected FFB wheel for read-only input polling and exercises the real WinForms wizard, including back navigation, required-control validation, final readiness, cancellation and resume. It restores any previous setup draft and checks that the active profile stayed unchanged:
 
@@ -124,8 +126,10 @@ Read-only diagnostics and offscreen UI preview:
 .\FH-Rig-Bridge.exe --preview-wizard C:\Temp\wizard-preview.png 2
 ```
 
+To recover a stopped session without opening the UI, run `FH-Rig-Bridge.exe --restore-visibility C:\Temp\visibility-report.json`. It applies the saved session rollback and records before/after state; it refuses to recover a session owned by another running process. The driver control handle is closed between snapshot, recovery and verification because HidHide allows one control client at a time.
+
 Diagnostics include controller instance identifiers; review before sharing. Preview mode disables driver setup, bridge start and visibility recovery. Wizard preview takes a page index from 0 to 5. Neither mode sends motor forces or saves a profile.
 
-Validation for this build: 63 automated checks pass, plus the desktop smoke flow with read-only R21 polling. All six wizard screens and the main window were rendered for inspection. Native driver inspection detected the installed vJoy/HidHide drivers and correctly flagged the current vJoy layout as incomplete (eight buttons and no continuous hats). Both bundled installers and the SDK DLL have valid publisher signatures. Development tests did not install/configure drivers, hide devices, write virtual outputs or test physical motor forces.
+Validation: 73 automated checks cover setup, mapping, FFB and recovery, including the real HidHide adapter with simulated native replies, partial writes, list growth and acknowledged writes that did not persist. The desktop smoke flow uses read-only R21 polling. Native recovery against the installed HidHide driver succeeded for the failed session: it removed the session's stale application rule, verified zero hidden-device rules and the original inactive state, and cleared the recovery record. All six wizard screens and the main window were rendered for inspection. Both bundled installers and the SDK DLL have valid publisher signatures. Development did not install/configure drivers or test physical motor forces.
 
 API references: [Microsoft DirectInput](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ee418998(v=vs.85)), [effect parameters](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ee416616(v=vs.85)), [vJoy SDK](https://github.com/BrunnerInnovation/vJoy), [vJoy configuration command source](https://github.com/BrunnerInnovation/vJoy/blob/v2.2.2.0/apps/vJoyConf/vJoyConfig/vJoyConfig.cpp), [HidHide](https://github.com/nefarius/HidHide).

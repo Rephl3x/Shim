@@ -17,6 +17,22 @@ namespace RigBridge
             try
             {
                 if (args.Length == 2 && args[0] == "--watchdog") { Watchdog(args[1]); return 0; }
+                if (args.Length == 2 && args[0] == "--restore-visibility")
+                {
+                    object before;
+                    using (var driver = new HideDriver())
+                        before = new { Active = driver.GetFlag(2052), Inverse = driver.GetFlag(2054), Blacklist = driver.GetList(2050), Whitelist = driver.GetList(2048) };
+                    // The control device permits one client handle at a time. Release the snapshot handle first.
+                    Store.Write(args[1], new { Restored = false, Before = before });
+                    HideSession.RecoverFile(Store.RecoveryPath);
+                    using (var driver = new HideDriver())
+                    {
+                        Store.Write(args[1], new { Restored = true, Before = before,
+                            After = new { Active = driver.GetFlag(2052), Inverse = driver.GetFlag(2054), Blacklist = driver.GetList(2050), Whitelist = driver.GetList(2048) },
+                            RecoveryPending = File.Exists(Store.RecoveryPath) });
+                    }
+                    return 0;
+                }
                 if (args.Length == 4 && args[0] == "--driver-status")
                 {
                     Store.Write(args[1], DriverSetup.Inspect(args[3], UInt32.Parse(args[2]))); return 0;
@@ -37,7 +53,7 @@ namespace RigBridge
                     return 0;
                 }
                 string preview = args.Length == 2 && args[0] == "--preview" ? args[1] : null;
-                if (args.Length > 0 && preview == null) throw new ArgumentException("Usage: FH-Rig-Bridge.exe [--diagnose report.json | --preview image.png]");
+                if (args.Length > 0 && preview == null) throw new ArgumentException("Usage: FH-Rig-Bridge.exe [--diagnose report.json | --restore-visibility report.json | --preview image.png | --preview-wizard image.png page]");
                 using (var mutex = new Mutex(false, "Local\\FHRigBridge-" + System.Security.Principal.WindowsIdentity.GetCurrent().User.Value))
                 {
                     bool owns = false;

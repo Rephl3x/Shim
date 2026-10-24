@@ -63,7 +63,15 @@ namespace RigBridge
             learn.Click += (s, e) => BeginLearn();
             autoButtons.Click += (s, e) => AutoMapButtons();
             remove.Click += (s, e) => { if (mappings.SelectedRows.Count > 0) { profile.Bindings.Remove((Binding)mappings.SelectedRows[0].Tag); RenderMappings(); } };
-            recover.Click += (s, e) => { try { HideSession.RecoverFile(Store.RecoveryPath); Log("Device visibility restored."); } catch (Exception ex) { Log(ex.Message); } UpdateButtons(); };
+            recover.Click += (s, e) => {
+                try
+                {
+                    if (runtime != null) throw new InvalidOperationException("Stop the bridge before restoring visibility.");
+                    HideSession.RecoverFile(Store.RecoveryPath, true); Log("Device visibility restored.");
+                }
+                catch (Exception ex) { Log(ex.Message); }
+                UpdateButtons();
+            };
             devices.ItemCheck += (s, e) => { if (!scanning && runtime == null) BeginInvoke(new Action(CaptureSelections)); };
             timer.Tick += (s, e) => TickRuntime(); timer.Start();
             Shown += async (s, e) => {
