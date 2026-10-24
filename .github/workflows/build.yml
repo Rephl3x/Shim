@@ -1,0 +1,34 @@
+name: Shim build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test on Windows
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Compile Shim and run hardware-free tests
+        shell: pwsh
+        run: .\BuildBridge.ps1 -Test -OutputDirectory .\artifacts\build
+
+      - name: Upload Shim build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shim-${{ github.sha }}
+          path: |
+            artifacts/build/Shim.exe
+            artifacts/build/Shim.Tests.exe
+          if-no-files-found: error
+          retention-days: 14

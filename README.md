@@ -1,5 +1,7 @@
 # Shim
 
+[![Shim build](https://github.com/Rephl3x/Shim/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Rephl3x/Shim/actions/workflows/build.yml)
+
 **Shim is a Windows controller aggregator and force-feedback adapter for Forza Motorsport and Forza Horizon.** It combines a MOZA wheel, pedals, shifters, handbrake and other selected controls into one vJoy virtual wheel, then forwards the game's force feedback to the physical steering wheel.
 
 The bridge reads physical controls through DirectInput, maps them to a configurable virtual controller and uses HidHide to keep the selected physical devices out of the game's controller list while the bridge runs. Forza binds the virtual wheel once in a custom profile. This avoids relying on the order in which several physical controllers happen to enumerate.
