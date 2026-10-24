@@ -43,7 +43,7 @@ namespace RigBridge
             this.profile = profile; this.window = window; this.monitorOnly = monitorOnly;
             requestedGain = appliedGain = profile.FfbGain;
             FfbStatus = monitorOnly ? "Read-only monitor." : profile.EnableFfb ? "Waiting for game FFB packets." : "FFB forwarding is off.";
-            thread = new Thread(Run) { IsBackground = true, Name = "FH Rig Bridge input and FFB" };
+            thread = new Thread(Run) { IsBackground = true, Name = "Shim input and FFB" };
             thread.SetApartmentState(ApartmentState.MTA);
         }
         public void Start() { thread.Start(); }

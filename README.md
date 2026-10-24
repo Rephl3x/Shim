@@ -1,6 +1,6 @@
-# FH Rig Bridge
+# Shim
 
-**FH Rig Bridge is a Windows controller aggregator and force-feedback adapter for Forza Motorsport and Forza Horizon.** It combines a MOZA wheel, pedals, shifters, handbrake and other selected controls into one vJoy virtual wheel, then forwards the game's force feedback to the physical steering wheel.
+**Shim is a Windows controller aggregator and force-feedback adapter for Forza Motorsport and Forza Horizon.** It combines a MOZA wheel, pedals, shifters, handbrake and other selected controls into one vJoy virtual wheel, then forwards the game's force feedback to the physical steering wheel.
 
 The bridge reads physical controls through DirectInput, maps them to a configurable virtual controller and uses HidHide to keep the selected physical devices out of the game's controller list while the bridge runs. Forza binds the virtual wheel once in a custom profile. This avoids relying on the order in which several physical controllers happen to enumerate.
 
@@ -15,7 +15,7 @@ The bridge reads physical controls through DirectInput, maps them to a configura
 
 ## Download and setup
 
-The latest build is [FH Rig Bridge v0.3.2](https://github.com/Rephl3x/Shim/releases/tag/v0.3.2). Each release includes its versioned ZIP and SHA-256 checksum. Extract the ZIP to a permanent folder and keep the executable beside its `drivers` and `runtime` folders.
+The latest build is [Shim v0.3.3](https://github.com/Rephl3x/Shim/releases/tag/v0.3.3). Each release includes its versioned ZIP and SHA-256 checksum. Extract the ZIP to a permanent folder and keep `Shim.exe` beside its `drivers` and `runtime` folders.
 
 Windows 10/11 x64 with .NET Framework 4.8 is required. vJoy and HidHide are included for one-time installation; the wizard checks their status and explains when a restart or repair is needed. For the full first-run guide, controls, troubleshooting and safety details, see [the bridge guide](bridge/README.md).
 

@@ -1,8 +1,8 @@
-# FH Rig Bridge 0.3.2
+# Shim 0.3.3
 
-FH Rig Bridge combines a MOZA wheel, pedals, shifters, handbrake and other selected physical controls into one vJoy controller for Forza Motorsport and Forza Horizon. It reads controls through DirectInput, applies learnable mappings and calibration, hides the selected physical devices through HidHide while bridging, and forwards the game's force feedback from vJoy to the physical steering wheel. The app has its own input reader, mapper, vJoy force-feedback decoder and DirectInput effect forwarding; it does not run Forza EmuWheel, UCR or another mapper.
+Shim combines a MOZA wheel, pedals, shifters, handbrake and other selected physical controls into one vJoy controller for Forza Motorsport and Forza Horizon. It reads controls through DirectInput, applies learnable mappings and calibration, hides the selected physical devices through HidHide while bridging, and forwards the game's force feedback from vJoy to the physical steering wheel. The app has its own input reader, mapper, vJoy force-feedback decoder and DirectInput effect forwarding; it does not run Forza EmuWheel, UCR or another mapper.
 
-Version 0.3.2 configures and verifies the selected vJoy slot as the final Save step, after device selection and calibration. The profile is saved only after that verification succeeds. Version 0.3.0 added the Drive dashboard, separate Mappings/Live inputs/Drivers/Activity pages, saved Day/Night mode and live FFB strength adjustment; 0.3.1 fixed clipped theme labels. User testing confirmed working controls and force feedback in Forza on the MOZA rig with 0.2.2. Existing mappings and calibration remain compatible.
+Version 0.3.3 renames the application and executable to Shim. Version 0.3.2 configures and verifies the selected vJoy slot as the final Save step, after device selection and calibration; the profile is saved only after verification succeeds. Version 0.3.0 added the Drive dashboard, separate Mappings/Live inputs/Drivers/Activity pages, saved Day/Night mode and live FFB strength adjustment; 0.3.1 fixed clipped theme labels. User testing confirmed working controls and force feedback in Forza on the MOZA rig with 0.2.2. Existing mappings and calibration remain compatible.
 
 ## Everyday controls
 
@@ -18,14 +18,14 @@ Version 0.2.2 fixes **Update physical FFB effect failed (0x800704DF)**. That cod
 
 ## What is in the package
 
-- `FH-Rig-Bridge.exe`: our app, including the setup wizard, automatic vJoy configuration, a read-only input monitor, learnable mappings, profile storage, FFB forwarding and device visibility recovery.
+- `Shim.exe`: the app, including the setup wizard, automatic vJoy configuration, a read-only input monitor, learnable mappings, profile storage, FFB forwarding and device visibility recovery.
 - `drivers/vJoySetup_v2.2.2.0_Win10_Win11.exe`: the unchanged official signed vJoy installer.
 - `drivers/HidHide_1.5.230_x64.exe`: the unchanged official signed HidHide installer.
 - `runtime/x64/vJoyInterface.dll`: the matching signed x64 library from the official vJoy SDK.
 - `licenses`: upstream license texts. `THIRD-PARTY-NOTICES.md` identifies the components and sources.
 - Our source, tests, dependency lock file and rebuild/package scripts.
 
-Windows 10/11 **x64** with .NET Framework 4.8 is required. The app itself needs no installer. Drivers need a one-time installation and may request a Windows restart. Driver installation/configuration starts when you click its button in setup. The bridge does not disable USB devices, patch game files, inject into the game, or change USB controller order.
+Windows 10/11 **x64** with .NET Framework 4.8 is required. Shim itself needs no installer. Drivers need a one-time installation and may request a Windows restart. Driver installation/configuration starts when you click its button in setup. Shim does not disable USB devices, patch game files, inject into the game, or change USB controller order.
 
 ## First setup
 
@@ -127,30 +127,30 @@ From the extracted source/package root, use Windows PowerShell:
 .\PackageBridge.ps1
 ```
 
-Version 0.3.2 moves vJoy slot configuration into the final Save step, after device mapping and calibration. The wizard configures only when required, verifies the resulting layout, and writes the profile only after verification succeeds.
+Version 0.3.3 renames the application and executable to Shim. Existing profiles, mappings and calibration stay in the same local application-data folder and are reused automatically. Version 0.3.2 moved vJoy slot configuration into the final Save step, after device mapping and calibration; the wizard verifies the resulting layout before writing the profile.
 
-The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\FH-Rig-Bridge-0.3.2.zip`; pass `-SkipTests` to package after a compile-only build. All three scripts accept `-OutputDirectory` to build a new release beside an open older copy, for example `PackageBridge.ps1 -OutputDirectory .\dist\bridge-0.3.2 -SkipTests`.
+The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\Shim-0.3.3.zip`; pass `-SkipTests` to package after a compile-only build. All three scripts accept `-OutputDirectory` to build a new release beside an open older copy, for example `PackageBridge.ps1 -OutputDirectory .\dist\shim-0.3.3 -SkipTests`.
 
 An optional desktop smoke check exercises main-window navigation, Day/Night changes, strength display and automatic saving to an isolated temporary profile. It also uses a connected FFB wheel for read-only wizard input polling, including back navigation, required-control validation, final readiness, cancellation and resume. Previous appearance preferences/setup drafts are restored, and the active profile must remain unchanged:
 
 ```powershell
-.\dist\bridge\FH-Rig-Bridge.Tests.exe --desktop
+.\dist\bridge\Shim.Tests.exe --desktop
 ```
 
 Read-only diagnostics and offscreen UI preview:
 
 ```powershell
-.\FH-Rig-Bridge.exe --diagnose C:\Temp\rig-report.json
-.\FH-Rig-Bridge.exe --preview C:\Temp\rig-preview.png
-.\FH-Rig-Bridge.exe --preview C:\Temp\rig-night.png Night
-.\FH-Rig-Bridge.exe --preview C:\Temp\mappings-night.png Night Mappings
-.\FH-Rig-Bridge.exe --preview-wizard C:\Temp\wizard-preview.png 2
-.\FH-Rig-Bridge.exe --preview-wizard C:\Temp\wizard-night.png 2 Night
+.\Shim.exe --diagnose C:\Temp\rig-report.json
+.\Shim.exe --preview C:\Temp\rig-preview.png
+.\Shim.exe --preview C:\Temp\rig-night.png Night
+.\Shim.exe --preview C:\Temp\mappings-night.png Night Mappings
+.\Shim.exe --preview-wizard C:\Temp\wizard-preview.png 2
+.\Shim.exe --preview-wizard C:\Temp\wizard-night.png 2 Night
 ```
 
-With the bridge stopped, `FH-Rig-Bridge.exe --check-ffb-update C:\Temp\ffb-update-report.json` creates/updates/frees constant and spring effects at **zero gain without any effect Start calls**. It opens the profile's physical FFB wheel exclusively, checks gain/autocentre restoration and does not start the bridge, hide devices, or write vJoy inputs. This validates driver interoperability; it is not a motor-force test.
+With Shim stopped, `Shim.exe --check-ffb-update C:\Temp\ffb-update-report.json` creates/updates/frees constant and spring effects at **zero gain without any effect Start calls**. It opens the profile's physical FFB wheel exclusively, checks gain/autocentre restoration and does not start Shim, hide devices, or write vJoy inputs. This validates driver interoperability; it is not a motor-force test.
 
-To recover a stopped session without opening the UI, run `FH-Rig-Bridge.exe --restore-visibility C:\Temp\visibility-report.json`. It applies the saved session rollback and records before/after state; it refuses to recover a session owned by another running process. The driver control handle is closed between snapshot, recovery and verification because HidHide allows one control client at a time.
+To recover a stopped session without opening the UI, run `Shim.exe --restore-visibility C:\Temp\visibility-report.json`. It applies the saved session rollback and records before/after state; it refuses to recover a session owned by another running process. The driver control handle is closed between snapshot, recovery and verification because HidHide allows one control client at a time.
 
 Diagnostics include controller instance identifiers; review before sharing. Preview mode disables driver setup, bridge start and visibility recovery. Wizard preview takes a page index from 0 to 5. Previews do not send motor forces or save profile/appearance preferences.
 

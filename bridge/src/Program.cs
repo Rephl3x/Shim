@@ -55,14 +55,14 @@ namespace RigBridge
                     return 0;
                 }
                 string preview = args.Length >= 2 && args.Length <= 4 && args[0] == "--preview" ? args[1] : null;
-                if (args.Length > 0 && preview == null) throw new ArgumentException("Usage: FH-Rig-Bridge.exe [--diagnose report.json | --restore-visibility report.json | --preview image.png | --preview-wizard image.png page]");
+                if (args.Length > 0 && preview == null) throw new ArgumentException("Usage: Shim.exe [--diagnose report.json | --restore-visibility report.json | --preview image.png | --preview-wizard image.png page]");
                 using (var mutex = new Mutex(false, "Local\\FHRigBridge-" + System.Security.Principal.WindowsIdentity.GetCurrent().User.Value))
                 {
                     bool owns = false;
                     try
                     {
                         try { owns = mutex.WaitOne(0); } catch (AbandonedMutexException) { owns = true; }
-                        if (!owns) throw new InvalidOperationException("FH Rig Bridge is already running in this Windows session.");
+                        if (!owns) throw new InvalidOperationException("Shim is already running in this Windows session.");
                         Application.Run(new BridgeForm(preview, preview != null && args.Length >= 3 ? args[2] : null, preview != null && args.Length >= 4 ? args[3] : null));
                     }
                     finally { if (owns) mutex.ReleaseMutex(); }
@@ -72,7 +72,7 @@ namespace RigBridge
             catch (Exception ex)
             {
                 File.WriteAllText(Path.Combine(Store.DirectoryPath, "startup-error.log"), ex.ToString());
-                if (args.Length == 0) MessageBox.Show(ex.Message, "FH Rig Bridge", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (args.Length == 0) MessageBox.Show(ex.Message, "Shim", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 1;
             }
         }

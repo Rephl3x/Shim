@@ -1,6 +1,6 @@
 # Third-party components
 
-FH Rig Bridge's mapper and force-feedback bridge are our own implementation. The package includes these unchanged upstream components:
+Shim's mapper and force-feedback bridge are our own implementation. The package includes these unchanged upstream components:
 
 | Component | Version | Included files | Source and release |
 | --- | --- | --- | --- |

@@ -9,7 +9,7 @@ else { & (Join-Path $PSScriptRoot 'BuildBridge.ps1') -Test -OutputDirectory $out
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bridge\README.md') -Destination (Join-Path $outputDirectory 'README.md') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bridge\THIRD-PARTY-NOTICES.md') -Destination (Join-Path $outputDirectory 'THIRD-PARTY-NOTICES.md') -Force
 $packageEntries = [Collections.Generic.List[object]]::new()
-foreach ($name in @('FH-Rig-Bridge.exe', 'README.md', 'THIRD-PARTY-NOTICES.md', 'dependencies.lock.json')) {
+foreach ($name in @('Shim.exe', 'README.md', 'THIRD-PARTY-NOTICES.md', 'dependencies.lock.json')) {
     $packageEntries.Add(@{Source=(Join-Path $outputDirectory $name); Entry=$name})
 }
 foreach ($folder in @('drivers', 'runtime', 'licenses')) {
@@ -31,7 +31,7 @@ $checksumsPath = Join-Path $outputDirectory 'SHA256SUMS.txt'
 $hashLines | Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 $packageEntries.Add(@{Source=$checksumsPath; Entry='SHA256SUMS.txt'})
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zipPath = Join-Path $PSScriptRoot 'dist\FH-Rig-Bridge-0.3.2.zip'
+$zipPath = Join-Path $PSScriptRoot 'dist\Shim-0.3.3.zip'
 # Overwrite only this exact output file. No recursive cleanup is used.
 $stream = [IO.File]::Open($zipPath, [IO.FileMode]::Create, [IO.FileAccess]::ReadWrite)
 $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create)

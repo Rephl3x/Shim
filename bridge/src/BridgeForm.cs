@@ -63,7 +63,7 @@ namespace RigBridge
         {
             this.previewPath = previewPath; this.previewPage = previewPage; this.profilePath = profilePath;
             Appearance.Load(); if (previewMode != null) Appearance.Set(previewMode, false);
-            Text = "FH Rig Bridge"; Font = new Font("Segoe UI", 10);
+            Text = "Shim"; Font = new Font("Segoe UI", 10);
             ClientSize = new Size(1280, 860); MinimumSize = new Size(1120, 790); AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterScreen; DoubleBuffered = true;
             logPath = Path.Combine(Store.DirectoryPath, "session-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".log");
@@ -125,8 +125,8 @@ namespace RigBridge
             var rail = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18, 30, 18, 20), RowCount = 4, ColumnCount = 1, Tag = "Surface" };
             rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 278)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
             var brand = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
-            brand.Controls.Add(new Label { Text = "FH", Font = new Font("Segoe UI Semibold", 27), AutoSize = true, Tag = "Accent" });
-            brand.Controls.Add(new Label { Text = "RIG BRIDGE", Font = new Font("Segoe UI Semibold", 10), AutoSize = true, Tag = "Muted" }); rail.Controls.Add(brand, 0, 0);
+            brand.Controls.Add(new Label { Text = "Shim", Font = new Font("Segoe UI Semibold", 27), AutoSize = true, Tag = "Accent" });
+            brand.Controls.Add(new Label { Text = "FORZA BRIDGE", Font = new Font("Segoe UI Semibold", 9), AutoSize = true, Tag = "Muted" }); rail.Controls.Add(brand, 0, 0);
             var menu = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             foreach (string name in new[] { "Drive", "Mappings", "Live inputs", "Drivers", "Activity" })
             {
@@ -136,7 +136,7 @@ namespace RigBridge
             rail.Controls.Add(menu, 0, 1);
             var railFooter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.3.2"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.3.3"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
