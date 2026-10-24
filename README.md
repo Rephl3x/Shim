@@ -19,7 +19,7 @@ The bridge reads physical controls through DirectInput, maps them to a configura
 
 The latest build is [Shim v0.3.3](https://github.com/Rephl3x/Shim/releases/tag/v0.3.3). Each release includes its versioned ZIP and SHA-256 checksum. Extract the ZIP to a permanent folder and keep `Shim.exe` beside its `drivers` and `runtime` folders.
 
-Windows 10/11 x64 with .NET Framework 4.8 is required. vJoy and HidHide are included for one-time installation; the wizard checks their status and explains when a restart or repair is needed. For the full first-run guide, controls, troubleshooting and safety details, see [the bridge guide](bridge/README.md).
+Windows 10/11 x64 with .NET Framework 4.8 or later is required; .NET Framework 4.8.1 is recommended where available. vJoy and HidHide are included for one-time installation; the wizard checks their status and explains when a restart or repair is needed. For the full first-run guide, controls, troubleshooting and safety details, see [the bridge guide](bridge/README.md).
 
 After setup, start the bridge before launching Forza. Create a custom wheel profile in Forza and bind it to the virtual controller. The app does not inject into the game, patch game files or change USB device order.
 

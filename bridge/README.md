@@ -25,7 +25,7 @@ Version 0.2.2 fixes **Update physical FFB effect failed (0x800704DF)**. That cod
 - `licenses`: upstream license texts. `THIRD-PARTY-NOTICES.md` identifies the components and sources.
 - Our source, tests, dependency lock file and rebuild/package scripts.
 
-Windows 10/11 **x64** with .NET Framework 4.8 is required. Shim itself needs no installer. Drivers need a one-time installation and may request a Windows restart. Driver installation/configuration starts when you click its button in setup. Shim does not disable USB devices, patch game files, inject into the game, or change USB controller order.
+Windows 10/11 **x64** with .NET Framework 4.8 or later is required; .NET Framework 4.8.1 is recommended where available. Shim itself needs no installer. Drivers need a one-time installation and may request a Windows restart. Driver installation/configuration starts when you click its button in setup. Shim does not disable USB devices, patch game files, inject into the game, or change USB controller order.
 
 ## First setup
 
@@ -129,7 +129,7 @@ From the extracted source/package root, use Windows PowerShell:
 
 Version 0.3.3 renames the application and executable to Shim. Existing profiles, mappings and calibration stay in the same local application-data folder and are reused automatically. Version 0.3.2 moved vJoy slot configuration into the final Save step, after device mapping and calibration; the wizard verifies the resulting layout before writing the profile.
 
-The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\Shim-0.3.3.zip`; pass `-SkipTests` to package after a compile-only build. All three scripts accept `-OutputDirectory` to build a new release beside an open older copy, for example `PackageBridge.ps1 -OutputDirectory .\dist\shim-0.3.3 -SkipTests`.
+The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification for both driver installers; the vJoy SDK DLL is hash-checked against its lock-file value. Fetching/package creation downloads files but never runs their installers. The pinned vJoy 2.2.2.0 and HidHide 1.5.230.0 versions are the latest signed upstream releases currently used by Shim; do not replace them with unofficial or unsigned builds. GitHub Actions runs the hardware-free tests, assembles the distributable package, and verifies dependency hashes/signatures on Windows. Its third-party actions are pinned to full commit SHAs and Dependabot checks GitHub Actions updates weekly. `PackageBridge.ps1` writes `dist\Shim-0.3.3.zip`; pass `-SkipTests` to package after a compile-only build. All three scripts accept `-OutputDirectory` to build a new release beside an open older copy, for example `PackageBridge.ps1 -OutputDirectory .\dist\shim-0.3.3 -SkipTests`.
 
 An optional desktop smoke check exercises main-window navigation, Day/Night changes, strength display and automatic saving to an isolated temporary profile. It also uses a connected FFB wheel for read-only wizard input polling, including back navigation, required-control validation, final readiness, cancellation and resume. Previous appearance preferences/setup drafts are restored, and the active profile must remain unchanged:
 
