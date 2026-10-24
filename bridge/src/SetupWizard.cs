@@ -38,7 +38,7 @@ namespace RigBridge
         private readonly CheckBox keepExisting = Check("Reuse existing axis and named gear mappings"), resume = Check("Resume my saved setup progress");
         private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 80 };
         private Label driverInfo;
-        private Button installVjoy, installHide, configure, recheck;
+        private Button installVjoy, installHide, recheck;
         private Label testInfo;
         private Button retest;
         private SetupStatus driverStatus;
@@ -82,7 +82,7 @@ namespace RigBridge
             controls.SelectedIndexChanged += (s, e) => ResetCapture();
             themeDay.Click += (s, e) => SetMode("Day"); themeNight.Click += (s, e) => SetMode("Night");
             Appearance.Changed += ApplyAppearance;
-            slot.ValueChanged += (s, e) => { draft.VirtualId = (uint)slot.Value; driverStatus = null; UpdateDriverText(); };
+            slot.ValueChanged += (s, e) => { draft.VirtualId = (uint)slot.Value; driverStatus = null; UpdateDriverText(); UpdateFinish(); };
             timer.Tick += (s, e) => Tick(); timer.Start();
             Shown += async (s, e) => {
                 if (preview)
@@ -136,17 +136,11 @@ namespace RigBridge
             }
             else if (page == 1)
             {
-                content.Controls.Add(Copy("Install each driver once, finish its installer, then configure your virtual wheel. You can continue choosing devices while an installer finishes; the final check will verify everything."));
+                content.Controls.Add(Copy("Install each driver once and finish its installer. You can continue choosing and calibrating devices while an installer finishes. The virtual wheel is configured during the final Save step."));
                 driverInfo = Copy(driverStatus == null ? "Checking driver installation and virtual controller layout..." : driverStatus.Summary); content.Controls.Add(driverInfo);
                 installVjoy = MakeButton("Install vJoy"); installHide = MakeButton("Install HidHide"); recheck = MakeButton("Recheck drivers");
                 installVjoy.Click += (s, e) => LaunchInstaller(true); installHide.Click += (s, e) => LaunchInstaller(false); recheck.Click += async (s, e) => await CheckAsync();
                 content.Controls.Add(Row(installVjoy, installHide, recheck));
-                slot.Value = Math.Max(1, Math.Min(16, draft.VirtualId)); content.Controls.Add(Row(Caption("Virtual wheel slot"), slot));
-                configure = MakeButton("Configure virtual wheel automatically"); configure.Click += (s, e) => {
-                    try { DriverSetup.Configure((uint)slot.Value, driverStatus == null ? null : driverStatus.Virtual); driverStatus = null; message.Text = "Applying configuration. Recheck drivers when the Windows prompt/tool has finished."; UpdateDriverText(); }
-                    catch (Exception ex) { message.Text = ex.Message; }
-                }; content.Controls.Add(configure);
-                content.Controls.Add(Copy("This sets the chosen vJoy slot to 8 axes, 128 buttons, 4 continuous hats and the 11 supported force effects. It replaces that slot's layout and refreshes vJoy. Close games and other vJoy feeders first."));
                 content.Controls.Add(Copy("If an installer still shows its final step, the driver may already be visible while setup remains incomplete. Do not launch it again. Complete its window or restart Windows if it stays stuck, then choose Recheck drivers."));
                 if (!preview) BeginInvoke(new Action(async () => await CheckAsync()));
             }
@@ -185,11 +179,13 @@ namespace RigBridge
             else if (page == 5)
             {
                 content.Controls.Add(Copy(draft.Devices.Count + " devices / " + draft.Bindings.Count(b => b.OutputKind == "Axis") + " axes / " + draft.Bindings.Count(b => b.OutputKind == "Button") + " buttons / " + draft.Bindings.Count(b => b.OutputKind == "POV") + " hats. Force feedback: " + (draft.EnableFfb ? draft.FfbGain + "% to your steering wheel." : "off.")));
+                slot.Value = Math.Max(1, Math.Min(16, draft.VirtualId)); content.Controls.Add(Row(Caption("Virtual wheel slot"), slot));
+                content.Controls.Add(Copy("Finish setup configures this vJoy slot, verifies the layout, then saves your profile. Configuration replaces the selected slot's layout with 8 axes, 128 buttons, 4 continuous hats and 11 supported force effects. Close games and other vJoy feeders first."));
                 testInfo = Copy("Checking drivers..."); content.Controls.Add(testInfo);
                 retest = MakeButton("Recheck drivers"); retest.Click += async (s, e) => await CheckAsync(); content.Controls.Add(retest);
                 live.MaximumSize = new Size(840, 0); live.Text = "Starting read-only live check..."; content.Controls.Add(live);
                 if (omitted > 0) content.Controls.Add(Copy(omitted + " extra declared buttons did not fit in the 128-button limit. Your explicitly learned gears are reserved. Use advanced mappings to substitute any extra buttons you need."));
-                content.Controls.Add(Copy("Turn the wheel, press each pedal and select every gear. Check the live mapped values above. Finish saves a backup of your previous profile, then opens the ready-to-start main window."));
+                content.Controls.Add(Copy("Turn the wheel, press each pedal and select every gear. Check the live mapped values above. Finish applies the virtual wheel configuration if needed, verifies it, saves a backup of your previous profile, then opens the ready-to-start main window."));
                 content.Controls.Add(Copy("Forza still needs a custom wheel profile bound to this virtual controller. The wizard cannot verify in-game feedback until you start the bridge and the game."));
                 StartMonitor(); if (!preview) BeginInvoke(new Action(async () => await CheckAsync()));
                 UpdateFinish();
@@ -254,7 +250,23 @@ namespace RigBridge
                 {
                     if (monitor == null || !monitor.Started || !monitor.Running) throw new InvalidOperationException("The live input check is not running. Return to Devices and reconnect missing controllers.");
                     StopMonitor(); await CheckAsync();
-                    if (driverStatus == null || !driverStatus.Ready || DriverSetup.Configuring) throw new InvalidOperationException("Finish driver setup first. Use Back to return to Drivers, then configure/recheck the virtual wheel.");
+                    if (driverStatus == null) throw new InvalidOperationException("Driver status could not be checked. Recheck drivers before saving.");
+                    if (!driverStatus.Ready)
+                    {
+                        var virtualStatus = driverStatus.Virtual;
+                        if (!driverStatus.HideReady || virtualStatus == null || !String.IsNullOrEmpty(virtualStatus.Error) || !virtualStatus.Enabled || !virtualStatus.Match || virtualStatus.State == 0 || virtualStatus.State == 2)
+                            throw new InvalidOperationException("Finish driver setup first. Use Back to return to Drivers, install or repair the required drivers, then recheck.");
+                        message.Text = "Configuring vJoy slot " + slot.Value + ". Approve the Windows administrator prompt; setup will verify the result before saving.";
+                        DriverSetup.Configure((uint)slot.Value, virtualStatus);
+                        DateTime deadline = DateTime.UtcNow.AddMinutes(3);
+                        while (DriverSetup.Configuring && DateTime.UtcNow < deadline) await Task.Delay(400);
+                        if (DriverSetup.Configuring) throw new TimeoutException("vJoy configuration is still running. Complete its Windows prompt, then click Finish setup again.");
+                        string configurationResult = DriverSetup.ConfigurationMessage; // Reap before the fresh driver probe.
+                        if (configurationResult == null) throw new InvalidOperationException("vJoy configuration did not finish cleanly. Recheck drivers before saving.");
+                        await CheckAsync();
+                        if (driverStatus == null || !driverStatus.Ready) throw new InvalidOperationException("vJoy configuration did not pass verification. Review the driver status above, then recheck before saving.");
+                    }
+                    if (DriverSetup.Configuring) throw new InvalidOperationException("Wait for vJoy configuration to finish before saving.");
                     draft.Validate(devices); draft.SetupVersion = SetupLogic.Version;
                     if (File.Exists(Store.ProfilePath)) File.Copy(Store.ProfilePath, Path.Combine(Store.DirectoryPath, "profile-before-setup-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".json"), false);
                     Store.Write(Store.ProfilePath, draft); if (File.Exists(DraftPath)) File.Delete(DraftPath);
@@ -287,7 +299,6 @@ namespace RigBridge
             bool busy = DriverSetup.InstallerRunning(true) || DriverSetup.InstallerRunning(false) || DriverSetup.Configuring;
             driverInfo.Text = checking ? "Checking actual driver and controller capabilities..." : driverStatus == null ? "Click Recheck drivers to refresh installation and controller readiness." : driverStatus.Summary;
             if (installVjoy != null) installVjoy.Enabled = installHide.Enabled = !checking && !busy && !preview;
-            if (configure != null) configure.Enabled = !checking && !busy && !preview && File.Exists(DriverSetup.ConfigPath);
             if (recheck != null) recheck.Enabled = !checking && !preview;
             slot.Enabled = !checking && !DriverSetup.Configuring;
         }
@@ -359,13 +370,13 @@ namespace RigBridge
             if (page != 5) return;
             if (testInfo != null) testInfo.Text = checking ? "Checking driver and virtual wheel readiness..." : driverStatus == null ? "Drivers have not been verified yet." : driverStatus.Summary;
             if (retest != null) retest.Enabled = !checking && !preview;
-            next.Enabled = !preview && !checking && !monitorFailed && monitor != null && monitor.Started && monitor.Running && driverStatus != null && driverStatus.Ready && !DriverSetup.Configuring;
+            next.Enabled = !preview && !navigating && !checking && !monitorFailed && monitor != null && monitor.Started && monitor.Running && driverStatus != null && !DriverSetup.Configuring;
         }
         private int tickCount;
         private void Tick()
         {
             if (preview) return;
-            if (++tickCount % 25 == 0 && page == 1)
+            if (++tickCount % 25 == 0 && (page == 1 || page == 5))
             {
                 if (driverStatus != null) { driverStatus.VjoyInstalling = DriverSetup.InstallerRunning(true); driverStatus.HideInstalling = DriverSetup.InstallerRunning(false); }
                 string configuration = DriverSetup.ConfigurationMessage;

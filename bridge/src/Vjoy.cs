@@ -101,7 +101,7 @@ namespace RigBridge
                 if ((binding.OutputKind == "Axis" && !axes[binding.OutputIndex]) ||
                     (binding.OutputKind == "Button" && binding.OutputIndex >= buttons) ||
                     (binding.OutputKind == "POV" && binding.OutputIndex >= povs))
-                    throw new InvalidOperationException("The vJoy layout is missing mapped controls. Stop the bridge, open Set up my rig and choose Configure virtual wheel automatically.");
+                    throw new InvalidOperationException("The vJoy layout is missing mapped controls. Stop the bridge and complete the final Save step in Set up my rig to configure the selected slot.");
             if (profile.EnableFfb && !IsDeviceFfb(id)) throw new InvalidOperationException("Enable force feedback on vJoy device " + id + " in Configure vJoy.");
             if (!AcquireVJD(id)) throw new InvalidOperationException("Could not acquire the virtual controller.");
             owned = true;

@@ -1,10 +1,11 @@
 [CmdletBinding()]
-param([string]$OutputDirectory)
+param([string]$OutputDirectory, [switch]$SkipTests)
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $PSScriptRoot 'dist\bridge' }
 $outputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 & (Join-Path $PSScriptRoot 'FetchBridgeDependencies.ps1') -OutputDirectory $outputDirectory
-& (Join-Path $PSScriptRoot 'BuildBridge.ps1') -Test -OutputDirectory $outputDirectory
+if ($SkipTests) { & (Join-Path $PSScriptRoot 'BuildBridge.ps1') -OutputDirectory $outputDirectory }
+else { & (Join-Path $PSScriptRoot 'BuildBridge.ps1') -Test -OutputDirectory $outputDirectory }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bridge\README.md') -Destination (Join-Path $outputDirectory 'README.md') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bridge\THIRD-PARTY-NOTICES.md') -Destination (Join-Path $outputDirectory 'THIRD-PARTY-NOTICES.md') -Force
 $packageEntries = [Collections.Generic.List[object]]::new()
@@ -30,7 +31,7 @@ $checksumsPath = Join-Path $outputDirectory 'SHA256SUMS.txt'
 $hashLines | Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 $packageEntries.Add(@{Source=$checksumsPath; Entry='SHA256SUMS.txt'})
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zipPath = Join-Path $PSScriptRoot 'dist\FH-Rig-Bridge-0.3.1.zip'
+$zipPath = Join-Path $PSScriptRoot 'dist\FH-Rig-Bridge-0.3.2.zip'
 # Overwrite only this exact output file. No recursive cleanup is used.
 $stream = [IO.File]::Open($zipPath, [IO.FileMode]::Create, [IO.FileAccess]::ReadWrite)
 $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create)

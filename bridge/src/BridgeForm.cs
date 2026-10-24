@@ -136,7 +136,7 @@ namespace RigBridge
             rail.Controls.Add(menu, 0, 1);
             var railFooter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.3.1"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.3.2"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
