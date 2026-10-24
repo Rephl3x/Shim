@@ -24,7 +24,7 @@ jobs:
         run: .\BuildBridge.ps1 -Test -OutputDirectory .\artifacts\build
 
       - name: Upload Shim build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Shim-${{ github.sha }}
           path: |
