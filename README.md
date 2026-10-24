@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/shim-repo-icon-512.png" alt="Shim transmission check-engine warning icon" width="240">
+</div>
+
 # Shim
 
 [![Shim build](https://github.com/Rephl3x/Shim/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Rephl3x/Shim/actions/workflows/build.yml)
