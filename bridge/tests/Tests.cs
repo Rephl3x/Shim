@@ -10,13 +10,108 @@ namespace RigBridge.Tests
     public static class TestProgram
     {
         private static int passed;
-        public static int Main()
+        [STAThread]
+        public static int Main(string[] args)
         {
+            if (args.Length == 4 && args[0] == "--driver-status") { Store.Write(args[1], DriverSetup.Inspect(args[3], UInt32.Parse(args[2]))); return 0; }
+            if (args.Length == 1 && args[0] == "--desktop") return DesktopTests.Run();
             try { Run(); Console.WriteLine("PASS: " + passed + " bridge tests. No drivers, hiding, virtual output or physical FFB were used."); return 0; }
             catch (Exception ex) { Console.Error.WriteLine("FAIL: " + ex); return 1; }
         }
         private static void Run()
         {
+            Test("Setup draft changes never mutate the active profile", () => {
+                var current = Profile(); current.Rig = new RigChoices { Wheel = "wheel" }; var copy = SetupLogic.Clone(current);
+                copy.Devices.Clear(); copy.Bindings[0].Invert = true; copy.Rig.Wheel = "changed";
+                Assert(current.Devices.Count == 1 && !current.Bindings[0].Invert && current.Rig.Wheel == "wheel", "Draft modified the original");
+            });
+            Test("Wizard asks for every requested axis and individual gear", () => {
+                var devices = SetupDevices(); var rig = new RigChoices { Wheel = "wheel", Pedals = "wheel", Clutch = true, Shifter = "shifter", Gears = 7, Reverse = true, Sequential = "box", Handbrake = "brake" };
+                var plan = SetupLogic.Plan(rig, devices);
+                Assert(plan.Count == 15 && plan.Count(c => c.Kind == "Axis") == 5 && plan.Count(c => c.Kind == "Button") == 10 && plan.Any(c => c.Name == "Reverse"), "Incomplete guided controls");
+                Assert(rig.Selected().Count == 4, "Shared wheel/pedals selected twice");
+            });
+            Test("Wizard rejects absent wheel and device roles without the required inputs", () => {
+                Throws(() => SetupLogic.Plan(new RigChoices(), SetupDevices()));
+                Throws(() => SetupLogic.Plan(new RigChoices { Wheel = "box" }, SetupDevices()));
+                Throws(() => SetupLogic.Plan(new RigChoices { Wheel = "wheel", Clutch = true }, SetupDevices()));
+            });
+            Test("Released high pedal is calibrated and automatically inverted", () => {
+                var first = new InputState(); var second = new InputState(); first.Axes[2] = 0.9; second.Axes[2] = 0.1;
+                var target = new SetupControl { Name = "Brake", Kind = "Axis", DeviceId = "wheel", Output = 2 };
+                var binding = SetupLogic.Calibrate(target, SetupDevices()[0], first, second);
+                Assert(binding.InputIndex == 2 && binding.Invert && binding.Minimum == 0.1 && binding.Maximum == 0.9, "Incorrect pedal calibration");
+                Assert(Mapper.Map(new[] { binding }, new Dictionary<string, InputState> { { "wheel", first } }).Axes[2] == 0, "Released pedal not zero");
+                Assert(Mapper.Map(new[] { binding }, new Dictionary<string, InputState> { { "wheel", second } }).Axes[2] == 1, "Full pedal not one");
+            });
+            Test("Reversed steering endpoints preserve left and right", () => {
+                var left = new InputState(); var right = new InputState(); left.Axes[0] = 0.8; right.Axes[0] = 0.2;
+                var binding = SetupLogic.Calibrate(new SetupControl { Name = "Steering", DeviceId = "wheel", Output = 0 }, SetupDevices()[0], left, right);
+                Assert(binding.InputIndex == 0 && binding.Invert && binding.Deadzone == 0, "Steering direction wrong");
+            });
+            Test("Axis learning rejects noise and ambiguous combined movement", () => {
+                var first = new InputState(); var second = new InputState(); var target = new SetupControl { Name = "Throttle", DeviceId = "wheel", Output = 1 };
+                second.Axes[0] = 0.01; Throws(() => SetupLogic.Calibrate(target, SetupDevices()[0], first, second));
+                second.Axes[0] = 1; second.Axes[1] = 0.9; Throws(() => SetupLogic.Calibrate(target, SetupDevices()[0], first, second));
+            });
+            Test("Gear learning ignores previously held buttons and requires one new input", () => {
+                var rest = new InputState(); var now = new InputState(); rest.Buttons[4] = now.Buttons[4] = true;
+                var target = new SetupControl { Name = "Reverse", DeviceId = "shifter", Output = 7 };
+                Assert(SetupLogic.LearnButton(target, SetupDevices()[1], rest, now) == null, "Held gear learned as new");
+                now.Buttons[9] = true; var result = SetupLogic.LearnButton(target, SetupDevices()[1], rest, now);
+                Assert(result.InputIndex == 9 && result.OutputIndex == 7 && result.Label == "Reverse", "Gear identity lost");
+                now.Buttons[10] = true; Throws(() => SetupLogic.LearnButton(target, SetupDevices()[1], rest, now));
+            });
+            Test("Guided controls cannot reuse one physical axis for throttle and brake", () => {
+                var profile = Profile(); SetupLogic.Put(profile, Axis("wheel", 1, 1));
+                Throws(() => SetupLogic.Put(profile, Axis("wheel", 1, 2)));
+                var replacement = Axis("wheel", 2, 1); SetupLogic.Put(profile, replacement);
+                Assert(profile.Bindings.Count == 2 && profile.Bindings.Contains(replacement), "Relearning did not replace target");
+            });
+            Test("Automatic buttons preserve learned gears and share space across all devices", () => {
+                var devices = SetupDevices(); var profile = new BridgeProfile { Devices = devices.Select(d => d.Id).ToList() };
+                profile.Bindings.Add(new Binding { Label = "Gear 1", DeviceId = "shifter", InputKind = "Button", InputIndex = 50, OutputKind = "Button", OutputIndex = 0 });
+                int omitted = SetupLogic.AddButtons(profile, devices);
+                Assert(profile.Bindings.Count == 128 && omitted == 384 && profile.Bindings[0].Label == "Gear 1", "Limit or gear reservation wrong");
+                Assert(devices.All(d => profile.Bindings.Any(b => b.DeviceId == d.Id)), "An accessory crowded out another device");
+                Assert(profile.Bindings.Count(b => b.DeviceId == "shifter" && b.InputIndex == 50) == 1, "Explicit gear was duplicated");
+                Assert(profile.Bindings.Select(b => b.OutputIndex).Distinct().Count() == 128, "Output collision");
+            });
+            Test("Migrating an old bulk button profile frees room for every device", () => {
+                var profile = new BridgeProfile(); profile.Bindings.Add(Axis("wheel", 0, 0));
+                for (int i = 0; i < 128; i++) profile.Bindings.Add(new Binding { DeviceId = "shifter", InputKind = "Button", InputIndex = i, OutputKind = "Button", OutputIndex = i });
+                var plan = SetupLogic.Plan(new RigChoices { Wheel = "wheel", Shifter = "shifter", Gears = 7 }, SetupDevices());
+                SetupLogic.KeepRequestedMappings(profile, plan, true);
+                Assert(profile.Bindings.Count == 1 && profile.Bindings[0].OutputKind == "Axis", "Generic shifter buttons blocked explicit gear learning/other sources");
+                profile.Bindings.Add(new Binding { Label = "Gear 1", DeviceId = "shifter", InputKind = "Button", InputIndex = 3, OutputKind = "Button", OutputIndex = 0 });
+                SetupLogic.KeepRequestedMappings(profile, plan, true); Assert(profile.Bindings.Count == 2, "Explicitly learned gear was lost on Back");
+                SetupLogic.KeepRequestedMappings(profile, plan, false); Assert(profile.Bindings.Count == 0, "Relearn option did not reset draft mappings");
+            });
+            Test("Automatic hats preserve mappings and stop at four outputs", () => {
+                var devices = SetupDevices(); foreach (var device in devices) for (int i = 0; i < 4; i++) device.Controls.Add(new InputControl { Kind = "POV", Index = i });
+                var profile = new BridgeProfile { Devices = devices.Select(d => d.Id).ToList() }; SetupLogic.AddHats(profile, devices); SetupLogic.AddHats(profile, devices);
+                Assert(profile.Bindings.Count == 4 && profile.Bindings.Select(b => b.OutputIndex).Distinct().Count() == 4, "Hat limit/collision");
+            });
+            Test("Driver detection does not treat an incomplete layout as ready", () => {
+                var status = ReadyVirtual(); status.Buttons = 8; status.Hats = 0;
+                Assert(!status.LayoutReady && status.Summary.Contains("needs configuration") && status.Summary.Contains("8/128"), "Misleading ready status");
+                status = ReadyVirtual(); status.Effects = 10; Assert(!status.LayoutReady, "Missing FFB effect ignored");
+                status = ReadyVirtual(); status.State = 2; Assert(!status.LayoutReady && status.Summary.Contains("in use"), "Busy device called ready");
+            });
+            Test("An active installer blocks final readiness even if the driver is available", () => {
+                var status = new SetupStatus { Virtual = ReadyVirtual(), HideReady = true, VjoyInstalling = true };
+                Assert(!status.Ready && status.Summary.Contains("installer is still running"), "Incomplete installation passed final gate");
+                status.VjoyInstalling = false; Assert(status.Ready, "Completed setup rejected");
+            });
+            Test("Automatic configuration targets one slot and explicitly enables standard effects", () => {
+                var args = DriverSetup.ConfigureArguments(3);
+                Assert(args.StartsWith("3 -f -a ") && args.Contains("-b 128 -p 4") && args.EndsWith("Spr Dm Inr Fric") && !args.Contains(" -r") && !args.Contains(" -d"), "Unsafe/incomplete configuration command");
+                Throws(() => DriverSetup.ConfigureArguments(0)); Throws(() => DriverSetup.ConfigureArguments(17));
+            });
+            Test("Windows argument quoting preserves spaces quotes and trailing backslashes", () => {
+                Assert(DriverSetup.Quote("C:\\Rig Folder\\") == "\"C:\\Rig Folder\\\\\"", "Trailing backslash quoting failed");
+                Assert(DriverSetup.Quote("a\"b") == "\"a\\\"b\"", "Embedded quote failed");
+            });
             Test("Five physical devices contribute to one output state", () => {
                 var input = new Dictionary<string, InputState>(); var bindings = new List<Binding>();
                 for (int i = 0; i < 5; i++)
@@ -167,6 +262,19 @@ namespace RigBridge.Tests
             });
         }
         private static Binding Axis(string device, int source, int target) { return new Binding { DeviceId = device, InputKind = "Axis", InputIndex = source, OutputKind = "Axis", OutputIndex = target }; }
+        private static VirtualStatus ReadyVirtual() { return new VirtualStatus { Slot = 1, Enabled = true, Match = true, State = 1, Axes = Enumerable.Repeat(true, 8).ToArray(), Buttons = 128, Hats = 4, Ffb = true, Effects = 11 }; }
+        private static List<PhysicalDevice> SetupDevices()
+        {
+            var result = new List<PhysicalDevice>();
+            foreach (string id in new[] { "wheel", "shifter", "box", "brake" })
+            {
+                var device = new PhysicalDevice { Id = id, Name = id, HidId = "HID\\" + id, ForceFeedback = id == "wheel" };
+                for (int i = 0; i < 128; i++) device.Controls.Add(new InputControl { Kind = "Button", Index = i, Name = "Button " + (i + 1) });
+                if (id == "wheel" || id == "brake") for (int i = 0; i < 8; i++) device.Controls.Add(new InputControl { Kind = "Axis", Index = i });
+                result.Add(device);
+            }
+            return result;
+        }
         private static BridgeProfile Profile() { return new BridgeProfile { Devices = new List<string> { "wheel" }, Bindings = new List<Binding> { Axis("wheel", 0, 0) } }; }
         private static List<PhysicalDevice> Devices() { return new List<PhysicalDevice> { new PhysicalDevice { Id = "wheel", Name = "Wheel", HidId = "HID\\WHEEL", ForceFeedback = true, Controls = new List<InputControl> { new InputControl { Kind = "Axis", Index = 0 } } } }; }
         private static byte[] Definition(int type) { var packet = new byte[18]; packet[0] = 0x11; packet[1] = 1; packet[2] = (byte)type; Put16(packet, 3, 65535); packet[11] = 255; packet[13] = 1; return packet; }

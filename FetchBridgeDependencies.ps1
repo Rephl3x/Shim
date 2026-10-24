@@ -18,7 +18,11 @@ foreach ($dependency in @($dependencies.vJoy, $dependencies.HidHide)) {
     Get-PinnedFile $dependency.url $installerPath $dependency.sha256
     $signature = Get-AuthenticodeSignature -LiteralPath $installerPath
     if ($signature.Status -ne 'Valid') { throw "The installer signature is not valid: $installerPath ($($signature.Status))." }
-    Copy-Item -LiteralPath $installerPath -Destination (Join-Path $driverPath $dependency.installer) -Force
+    $bundledInstaller = Join-Path $driverPath $dependency.installer
+    # Keep a matching installer in place, including when Windows is still running it.
+    if (-not (Test-Path -LiteralPath $bundledInstaller) -or (Get-FileHash -LiteralPath $bundledInstaller -Algorithm SHA256).Hash -ne $dependency.sha256) {
+        Copy-Item -LiteralPath $installerPath -Destination $bundledInstaller -Force
+    }
     Write-Output "Verified signed installer: $($dependency.installer)"
 }
 $sdkPath = Join-Path $cachePath 'vJoy-SDK-v2.2.2.0.zip'

@@ -11,7 +11,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Bridge compilation failed.' }
 Write-Output "Built $(Join-Path $outputDirectory 'FH-Rig-Bridge.exe')"
 if ($Test) {
     $testPath = Join-Path $outputDirectory 'FH-Rig-Bridge.Tests.exe'
-    & $compiler /nologo /target:exe /platform:x64 /optimize+ /warn:4 /langversion:5 "/out:$testPath" /main:RigBridge.Tests.TestProgram @references @sources (Join-Path $PSScriptRoot 'bridge\tests\Tests.cs')
+    $testSources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'bridge\tests') -Filter '*.cs' | ForEach-Object FullName)
+    & $compiler /nologo /target:exe /platform:x64 /optimize+ /warn:4 /langversion:5 "/out:$testPath" /main:RigBridge.Tests.TestProgram @references @sources @testSources
     if ($LASTEXITCODE -ne 0) { throw 'Bridge test compilation failed.' }
     & $testPath
     if ($LASTEXITCODE -ne 0) { throw 'Bridge tests failed.' }

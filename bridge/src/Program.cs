@@ -17,6 +17,10 @@ namespace RigBridge
             try
             {
                 if (args.Length == 2 && args[0] == "--watchdog") { Watchdog(args[1]); return 0; }
+                if (args.Length == 4 && args[0] == "--driver-status")
+                {
+                    Store.Write(args[1], DriverSetup.Inspect(args[3], UInt32.Parse(args[2]))); return 0;
+                }
                 if (args.Length == 2 && args[0] == "--diagnose")
                 {
                     DirectInput.Trace = message => File.AppendAllText(Path.Combine(Store.DirectoryPath, "directinput-diagnostic.log"), message + Environment.NewLine);
@@ -26,6 +30,12 @@ namespace RigBridge
                     return 0;
                 }
                 Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+                if (args.Length >= 2 && args[0] == "--preview-wizard")
+                {
+                    BridgeProfile saved = File.Exists(Store.ProfilePath) ? Store.Read<BridgeProfile>(Store.ProfilePath) : new BridgeProfile();
+                    using (var direct = new DirectInput()) Application.Run(new SetupWizard(saved, direct.Enumerate(), args[1], args.Length == 3 ? Int32.Parse(args[2]) : 0));
+                    return 0;
+                }
                 string preview = args.Length == 2 && args[0] == "--preview" ? args[1] : null;
                 if (args.Length > 0 && preview == null) throw new ArgumentException("Usage: FH-Rig-Bridge.exe [--diagnose report.json | --preview image.png]");
                 using (var mutex = new Mutex(false, "Local\\FHRigBridge-" + System.Security.Principal.WindowsIdentity.GetCurrent().User.Value))

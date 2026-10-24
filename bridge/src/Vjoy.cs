@@ -26,6 +26,7 @@ namespace RigBridge
         [DllImport("vJoyInterface.dll", CallingConvention = CallingConvention.Cdecl)] private static extern bool SetBtn(bool value, uint id, byte button);
         [DllImport("vJoyInterface.dll", CallingConvention = CallingConvention.Cdecl)] private static extern bool SetContPov(uint value, uint id, byte pov);
         [DllImport("vJoyInterface.dll", CallingConvention = CallingConvention.Cdecl)] private static extern bool IsDeviceFfb(uint id);
+        [DllImport("vJoyInterface.dll", CallingConvention = CallingConvention.Cdecl)] private static extern bool IsDeviceFfbEffect(uint id, uint effect);
         [DllImport("vJoyInterface.dll", CallingConvention = CallingConvention.Cdecl)] private static extern void FfbRegisterGenCB(FfbCallback callback, IntPtr context);
         [DllImport("vJoyInterface.dll", CallingConvention = CallingConvention.Cdecl)] private static extern uint Ffb_h_DeviceID(IntPtr packet, out uint id);
         [DllImport("vJoyInterface.dll", CallingConvention = CallingConvention.Cdecl)] private static extern uint Ffb_h_Type(IntPtr packet, out uint type);
@@ -48,8 +49,25 @@ namespace RigBridge
         }
         public static string Probe(string path)
         {
-            try { Load(path); ushort dll, driver; return !vJoyEnabled() ? "vJoy driver is not enabled" : !DriverMatch(out dll, out driver) ? "vJoy DLL/driver version mismatch" : "vJoy is ready"; }
-            catch (Exception ex) { return "vJoy: " + ex.Message; }
+            return Inspect(path, 1).Summary;
+        }
+        public static VirtualStatus Inspect(string path, uint id)
+        {
+            var result = new VirtualStatus { Slot = id };
+            try
+            {
+                Load(path); ushort dll, driver;
+                result.Enabled = vJoyEnabled(); result.Match = DriverMatch(out dll, out driver);
+                result.DllVersion = dll; result.DriverVersion = driver;
+                if (!result.Enabled || !result.Match) return result;
+                result.State = GetVJDStatus(id);
+                if (result.State > 1) return result;
+                result.Axes = Enumerable.Range(0, 8).Select(i => GetVJDAxisExist(id, (uint)(0x30 + i))).ToArray();
+                result.Buttons = GetVJDButtonNumber(id); result.Hats = GetVJDContPovNumber(id); result.Ffb = IsDeviceFfb(id);
+                result.Effects = new uint[] { 0x26, 0x27, 0x30, 0x31, 0x32, 0x33, 0x34, 0x40, 0x41, 0x42, 0x43 }.Count(effect => IsDeviceFfbEffect(id, effect));
+            }
+            catch (Exception ex) { result.Error = ex.Message; }
+            return result;
         }
         private static void Load(string path)
         {
@@ -83,7 +101,7 @@ namespace RigBridge
                 if ((binding.OutputKind == "Axis" && !axes[binding.OutputIndex]) ||
                     (binding.OutputKind == "Button" && binding.OutputIndex >= buttons) ||
                     (binding.OutputKind == "POV" && binding.OutputIndex >= povs))
-                    throw new InvalidOperationException("Configure vJoy with all 8 axes, 128 buttons and 1 continuous POV (up to 4 if mapped).");
+                    throw new InvalidOperationException("The vJoy layout is missing mapped controls. Stop the bridge, open Set up my rig and choose Configure virtual wheel automatically.");
             if (profile.EnableFfb && !IsDeviceFfb(id)) throw new InvalidOperationException("Enable force feedback on vJoy device " + id + " in Configure vJoy.");
             if (!AcquireVJD(id)) throw new InvalidOperationException("Could not acquire the virtual controller.");
             owned = true;

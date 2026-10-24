@@ -34,6 +34,7 @@ namespace RigBridge
     }
     public sealed class Binding
     {
+        public string Label { get; set; }
         public string OutputKind { get; set; }
         public int OutputIndex { get; set; }
         public string DeviceId { get; set; }
@@ -47,6 +48,8 @@ namespace RigBridge
     }
     public sealed class BridgeProfile
     {
+        public int SetupVersion { get; set; }
+        public RigChoices Rig { get; set; }
         public List<string> Devices { get; set; }
         public List<Binding> Bindings { get; set; }
         public string FfbDevice { get; set; }

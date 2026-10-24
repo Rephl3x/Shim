@@ -39,6 +39,7 @@ namespace RigBridge
         private Dictionary<string, InputState> baseline;
         private readonly string logPath;
         private readonly List<Control> setupActions = new List<Control>();
+        private readonly Button setupWizard = Button("Set up my rig");
         public BridgeForm(string previewPath)
         {
             this.previewPath = previewPath;
@@ -55,6 +56,7 @@ namespace RigBridge
             dll.Text = String.IsNullOrEmpty(profile.VjoyDll) ? Vjoy.DefaultDll : profile.VjoyDll;
             refresh.Click += async (s, e) => await RefreshAsync();
             save.Click += (s, e) => SaveProfile();
+            setupWizard.Click += async (s, e) => await RunSetup();
             watch.Click += (s, e) => Start(true);
             start.Click += (s, e) => Start(false);
             stop.Click += (s, e) => { if (runtime != null) { runtime.RequestStop(); status.Text = "Stopping forces and restoring device visibility..."; } };
@@ -71,6 +73,7 @@ namespace RigBridge
                     using (var bitmap = new Bitmap(Width, Height)) { DrawToBitmap(bitmap, new Rectangle(0, 0, Width, Height)); bitmap.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png); }
                     Close();
                 }
+                else if (profile.SetupVersion < SetupLogic.Version) await RunSetup();
             };
             FormClosing += (s, e) => { if (runtime != null) { e.Cancel = true; closing = true; runtime.RequestStop(); status.Text = "Stopping the bridge before closing..."; } };
             FormClosed += (s, e) => timer.Dispose();
@@ -84,12 +87,12 @@ namespace RigBridge
         private void Build()
         {
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1, RowCount = 6 };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 72)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 53)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 120));
             var title = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
             title.Controls.Add(new Label { Text = "One rig. One virtual wheel.", Font = new Font("Segoe UI", 22, FontStyle.Bold), AutoSize = true });
-            title.Controls.Add(Label("Select devices, learn mappings, then start the bridge before launching Forza. Inputs and FFB use our own bridge."));
+            title.Controls.Add(Flow(setupWizard, Label("Start the bridge before launching Forza. Use Set up my rig for guided configuration.")));
             layout.Controls.Add(title, 0, 0);
             var tabs = new TabControl { Dock = DockStyle.Fill };
             var mappingTab = new TabPage("Devices and mappings");
@@ -119,12 +122,12 @@ namespace RigBridge
                 choose = Button("Select vJoy DLL"), check = Button("Check drivers");
             getVjoy.Click += (s, e) => InstallDriver(true);
             getHide.Click += (s, e) => InstallDriver(false);
-            choose.Click += (s, e) => { using (var dialog = new OpenFileDialog { Filter = "vJoyInterface.dll|vJoyInterface.dll", FileName = "vJoyInterface.dll" }) if (dialog.ShowDialog(this) == DialogResult.OK) { dll.Text = dialog.FileName; CheckDrivers(); } };
-            check.Click += (s, e) => CheckDrivers();
+            choose.Click += async (s, e) => { using (var dialog = new OpenFileDialog { Filter = "vJoyInterface.dll|vJoyInterface.dll", FileName = "vJoyInterface.dll" }) if (dialog.ShowDialog(this) == DialogResult.OK) { dll.Text = dialog.FileName; await CheckDrivers(); } };
+            check.Click += async (s, e) => await CheckDrivers();
             setupActions.AddRange(new Control[] { getVjoy, getHide, choose, check });
             setup.Controls.Add(Flow(getVjoy, getHide, check));
             setup.Controls.Add(Label("Install the official drivers once. Restart Windows if requested. Configure one vJoy device with:"));
-            setup.Controls.Add(Label("8 axes (X/Y/Z/Rx/Ry/Rz/Slider 1/Slider 2), 128 buttons, 1 continuous POV."));
+            setup.Controls.Add(Label("Use Set up my rig to configure vJoy automatically and learn your devices."));
             setup.Controls.Add(Label("Enable FFB on X with Constant, Ramp, Periodic and Condition effects. Leave Custom Force disabled."));
             setup.Controls.Add(Flow(Label("x64 SDK DLL:"), dll, choose));
             setup.Controls.Add(Label("HidHide must use normal mode. The bridge temporarily hides selected gaming interfaces and restores its changes on stop."));
@@ -149,15 +152,33 @@ namespace RigBridge
                 wheel.SelectedItem = wheel.Items.Cast<PhysicalDevice>().FirstOrDefault(d => d.Id == profile.FfbDevice);
                 if (wheel.SelectedIndex < 0 && wheel.Items.Count > 0) wheel.SelectedIndex = 0;
                 RenderMappings();
-                string dllPath = dll.Text;
-                prerequisites.Text = await Task.Run(() => Vjoy.Probe(dllPath) + Environment.NewLine + HideDriver.Probe());
+                await CheckDrivers();
                 Log("Detected " + available.Count + " physical controllers. Driver status is on the Driver setup tab.");
                 if (File.Exists(Store.RecoveryPath)) Log("A previous hiding session needs recovery. Click Restore visibility.");
             }
             catch (Exception ex) { Log(ex.Message); }
             finally { scanning = false; UpdateButtons(); }
         }
-        private void CheckDrivers() { prerequisites.Text = Vjoy.Probe(dll.Text) + Environment.NewLine + HideDriver.Probe(); }
+        private async Task CheckDrivers()
+        {
+            prerequisites.Text = "Checking driver installation and virtual controller layout...";
+            var result = await DriverSetup.CheckAsync(dll.Text, (uint)virtualId.Value);
+            prerequisites.Text = result.Summary;
+        }
+        private async Task RunSetup()
+        {
+            if (runtime != null || scanning || previewPath != null) return;
+            CaptureSelections();
+            using (var wizard = new SetupWizard(profile, available, null, 0))
+            {
+                if (wizard.ShowDialog(this) != DialogResult.OK) return;
+                profile = wizard.Result;
+                enableFfb.Checked = profile.EnableFfb; invert.Checked = profile.InvertFfb;
+                gain.Value = profile.FfbGain; virtualId.Value = profile.VirtualId;
+                dll.Text = String.IsNullOrEmpty(profile.VjoyDll) ? Vjoy.DefaultDll : profile.VjoyDll;
+            }
+            await RefreshAsync(); Log("Setup saved. Start the bridge, then launch Forza and bind your virtual wheel controls.");
+        }
         private void CaptureSelections()
         {
             profile.Devices = devices.CheckedItems.Cast<PhysicalDevice>().Select(d => d.Id).ToList();
@@ -238,7 +259,7 @@ namespace RigBridge
             }
             if (runtime.Started) status.Text = (learning ? "Learning input... " : "Running. ") + runtime.Frames + " input frames; " + runtime.FfbPackets + " FFB packets received.";
         }
-        private static string OutputName(Binding binding) { return binding.OutputKind == "Axis" ? Mapper.AxisNames[binding.OutputIndex] : binding.OutputKind + " " + (binding.OutputIndex + 1); }
+        private static string OutputName(Binding binding) { return (String.IsNullOrEmpty(binding.Label) ? "" : binding.Label + " / ") + (binding.OutputKind == "Axis" ? Mapper.AxisNames[binding.OutputIndex] : binding.OutputKind + " " + (binding.OutputIndex + 1)); }
         private void RenderMappings()
         {
             mappings.Rows.Clear();
@@ -260,14 +281,14 @@ namespace RigBridge
             recover.Enabled = idle && previewPath == null && File.Exists(Store.RecoveryPath);
             learn.Enabled = runtime != null;
             foreach (var action in setupActions) action.Enabled = idle && previewPath == null;
+            setupWizard.Enabled = idle && previewPath == null;
         }
         private void InstallDriver(bool vjoy)
         {
             try
             {
                 if (!File.Exists(DriverPackages.PathFor(vjoy))) { Open(vjoy ? "https://github.com/BrunnerInnovation/vJoy/releases" : "https://github.com/nefarius/HidHide/releases"); return; }
-                DriverPackages.Verify(vjoy);
-                Process.Start(new ProcessStartInfo { FileName = DriverPackages.PathFor(vjoy), UseShellExecute = true, Verb = "runas" });
+                DriverSetup.Install(vjoy);
                 Log("Started the official " + (vjoy ? "vJoy" : "HidHide") + " installer. Follow its setup wizard; restart if requested, then click Check drivers.");
             }
             catch (Exception ex) { Log("Driver setup: " + ex.Message); }
