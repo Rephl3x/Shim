@@ -1,0 +1,20 @@
+{
+  "vJoy": {
+    "version": "2.2.2.0",
+    "release": "https://github.com/BrunnerInnovation/vJoy/releases/tag/v2.2.2.0",
+    "installer": "vJoySetup_v2.2.2.0_Win10_Win11.exe",
+    "url": "https://github.com/BrunnerInnovation/vJoy/releases/download/v2.2.2.0/vJoySetup_v2.2.2.0_Win10_Win11.exe",
+    "sha256": "ef569a3105cd301b89580f18f60c66b339e95296acf2c0dfcaf4b4bbf8ab68fe",
+    "sdkUrl": "https://github.com/BrunnerInnovation/vJoy/releases/download/v2.2.2.0/SDK.zip",
+    "sdkSha256": "0e796b185b66819d5fbeae645f3f038ecbfbbde837d3d3f06cba82ae1db07c67",
+    "licenseUrl": "https://raw.githubusercontent.com/BrunnerInnovation/vJoy/v2.2.2.0/LICENSE.txt"
+  },
+  "HidHide": {
+    "version": "1.5.230.0",
+    "release": "https://github.com/nefarius/HidHide/releases/tag/v1.5.230.0",
+    "installer": "HidHide_1.5.230_x64.exe",
+    "url": "https://github.com/nefarius/HidHide/releases/download/v1.5.230.0/HidHide_1.5.230_x64.exe",
+    "sha256": "f4bbbcb82e6258641b887c74bc81c4c5f66e4aa811808dfc304347687b7605f6",
+    "licenseUrl": "https://raw.githubusercontent.com/nefarius/HidHide/v1.5.230.0/LICENSE"
+  }
+}

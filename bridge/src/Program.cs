@@ -1,0 +1,93 @@
+using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace RigBridge
+{
+    public static class Program
+    {
+        [STAThread]
+        public static int Main(string[] args)
+        {
+            Directory.CreateDirectory(Store.DirectoryPath);
+            try
+            {
+                if (args.Length == 2 && args[0] == "--watchdog") { Watchdog(args[1]); return 0; }
+                if (args.Length == 2 && args[0] == "--diagnose")
+                {
+                    DirectInput.Trace = message => File.AppendAllText(Path.Combine(Store.DirectoryPath, "directinput-diagnostic.log"), message + Environment.NewLine);
+                    using (var direct = new DirectInput()) Store.Write(args[1], new {
+                        CapturedUtc = DateTime.UtcNow, Devices = direct.Enumerate(), Vjoy = Vjoy.Probe(null), HidHide = HideDriver.Probe()
+                    });
+                    return 0;
+                }
+                Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+                string preview = args.Length == 2 && args[0] == "--preview" ? args[1] : null;
+                if (args.Length > 0 && preview == null) throw new ArgumentException("Usage: FH-Rig-Bridge.exe [--diagnose report.json | --preview image.png]");
+                using (var mutex = new Mutex(false, "Local\\FHRigBridge-" + System.Security.Principal.WindowsIdentity.GetCurrent().User.Value))
+                {
+                    bool owns = false;
+                    try
+                    {
+                        try { owns = mutex.WaitOne(0); } catch (AbandonedMutexException) { owns = true; }
+                        if (!owns) throw new InvalidOperationException("FH Rig Bridge is already running in this Windows session.");
+                        Application.Run(new BridgeForm(preview));
+                    }
+                    finally { if (owns) mutex.ReleaseMutex(); }
+                }
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                File.WriteAllText(Path.Combine(Store.DirectoryPath, "startup-error.log"), ex.ToString());
+                if (args.Length == 0) MessageBox.Show(ex.Message, "FH Rig Bridge", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return 1;
+            }
+        }
+        private static void Watchdog(string token)
+        {
+            if (token.Length != 32 || token.Any(c => !Uri.IsHexDigit(c))) throw new ArgumentException("Invalid recovery token.");
+            if (!File.Exists(Store.RecoveryPath)) return;
+            var recovery = Store.Read<HideRecovery>(Store.RecoveryPath);
+            if (recovery.Token != token) return;
+            string ready = Store.RecoveryPath + ".ready-" + token;
+            File.WriteAllText(ready, "ready");
+            try
+            {
+                while (File.Exists(Store.RecoveryPath))
+                {
+                    var current = Store.Read<HideRecovery>(Store.RecoveryPath);
+                    if (current.Token != token) return;
+                    if (!HideSession.ParentIsAlive(recovery))
+                    {
+                        StopWheel(recovery.WheelId);
+                        HideSession.RecoverFile(Store.RecoveryPath);
+                        return;
+                    }
+                    Thread.Sleep(250);
+                }
+            }
+            finally { if (File.Exists(ready)) File.Delete(ready); }
+        }
+        private static void StopWheel(string id)
+        {
+            if (String.IsNullOrEmpty(id)) return;
+            try
+            {
+                using (var window = new Form())
+                using (var direct = new DirectInput())
+                {
+                    var wheel = direct.Enumerate().FirstOrDefault(d => d.Id == id && d.ForceFeedback && !d.Virtual);
+                    if (wheel == null) return;
+                    using (var reader = direct.Open(wheel, window.Handle, true))
+                    { reader.Device.SendForceFeedbackCommand(2); reader.Device.SendForceFeedbackCommand(32); }
+                }
+            }
+            catch (Exception ex) { File.AppendAllText(Path.Combine(Store.DirectoryPath, "watchdog.log"), "Wheel stop: " + ex + Environment.NewLine); }
+        }
+    }
+}
