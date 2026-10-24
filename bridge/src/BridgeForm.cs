@@ -136,13 +136,14 @@ namespace RigBridge
             rail.Controls.Add(menu, 0, 1);
             var railFooter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.3.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.3.1"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
-            header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 168));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
             var titles = Stack(); titles.Controls.Add(pageTitle); titles.Controls.Add(pageHint); header.Controls.Add(titles, 0, 0);
-            day.AutoSize = night.AutoSize = false; day.MinimumSize = night.MinimumSize = new Size(72, 36); day.Size = night.Size = new Size(72, 36);
+            day.AutoSize = night.AutoSize = false; day.MinimumSize = night.MinimumSize = new Size(82, 36); day.Size = night.Size = new Size(82, 36);
+            day.Padding = night.Padding = new Padding(3, 0, 3, 0);
             header.Controls.Add(Flow(day, night), 1, 0); content.Controls.Add(header, 0, 0); content.Controls.Add(deck, 0, 1);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 18, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 286));

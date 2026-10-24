@@ -1,8 +1,8 @@
-# FH Rig Bridge 0.3.0
+# FH Rig Bridge 0.3.1
 
 Our Windows app combines physical racing controls into one virtual force-feedback controller. It contains our own DirectInput reader, input mapper, vJoy force-feedback packet decoder, and DirectInput effect forwarding code. It does not run Forza EmuWheel, UCR, or another mapper.
 
-Version 0.3.0 adds a cleaner Drive dashboard, separate Mappings/Live inputs/Drivers/Activity pages, saved Day/Night mode across the main window and setup wizard, and live FFB strength adjustment. User testing confirmed working controls and FFB in Forza on the MOZA rig with 0.2.2. Existing device mappings and calibration remain compatible.
+Version 0.3.1 fixes clipped Day/Night labels in the main window and setup wizard. Version 0.3.0 added a cleaner Drive dashboard, separate Mappings/Live inputs/Drivers/Activity pages, saved Day/Night mode across the main window and setup wizard, and live FFB strength adjustment. User testing confirmed working controls and FFB in Forza on the MOZA rig with 0.2.2. Existing device mappings and calibration remain compatible.
 
 ## Everyday controls
 
@@ -127,7 +127,7 @@ From the extracted source/package root, use Windows PowerShell:
 .\PackageBridge.ps1
 ```
 
-The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\FH-Rig-Bridge-0.3.0.zip`. All three scripts accept `-OutputDirectory` to build a new release beside an open older copy, for example `PackageBridge.ps1 -OutputDirectory .\dist\bridge-0.3.0`.
+The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages are required. Dependency fetching uses pinned official release URLs, SHA-256 hashes and Authenticode verification. Fetching/package creation downloads files but never runs their installers. `PackageBridge.ps1` writes `dist\FH-Rig-Bridge-0.3.1.zip`. All three scripts accept `-OutputDirectory` to build a new release beside an open older copy, for example `PackageBridge.ps1 -OutputDirectory .\dist\bridge-0.3.1`.
 
 An optional desktop smoke check exercises main-window navigation, Day/Night changes, strength display and automatic saving to an isolated temporary profile. It also uses a connected FFB wheel for read-only wizard input polling, including back navigation, required-control validation, final readiness, cancellation and resume. Previous appearance preferences/setup drafts are restored, and the active profile must remain unchanged:
 

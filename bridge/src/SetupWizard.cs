@@ -66,9 +66,10 @@ namespace RigBridge
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 65)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             var top = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
-            top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); top.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 166));
+            top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); top.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
             steps.Tag = "Accent"; steps.Font = new Font("Segoe UI Semibold", 9); top.Controls.Add(steps, 0, 0);
-            themeDay.AutoSize = themeNight.AutoSize = false; themeDay.MinimumSize = themeNight.MinimumSize = new Size(72, 32); themeDay.Size = themeNight.Size = new Size(72, 32);
+            themeDay.AutoSize = themeNight.AutoSize = false; themeDay.MinimumSize = themeNight.MinimumSize = new Size(82, 32); themeDay.Size = themeNight.Size = new Size(82, 32);
+            themeDay.Padding = themeNight.Padding = new Padding(3, 0, 3, 0);
             themeDay.Margin = themeNight.Margin = new Padding(0, 0, 8, 0);
             var modes = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Margin = new Padding(0) }; modes.Controls.AddRange(new Control[] { themeDay, themeNight }); top.Controls.Add(modes, 1, 0);
             layout.Controls.Add(top, 0, 0); layout.Controls.Add(heading, 0, 1); layout.Controls.Add(body, 0, 2); layout.Controls.Add(message, 0, 3);
