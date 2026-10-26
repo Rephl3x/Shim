@@ -20,11 +20,11 @@ The bridge reads physical controls through DirectInput, maps them to a configura
 - Day and Night appearance modes, a Drive dashboard, driver status and activity logs are included.
 - Shim's check-engine transmission graphic and black-and-orange accent palette carry through the main app and first-run setup; Day and Night modes remain available.
 - Start Forza from the Drive screen, with an option to start the bridge and wait until it is ready before opening the game.
-- An Updates page compares Shim, vJoy and HidHide with their latest published GitHub releases and links to upstream update details. Driver updates are reviewed and installed manually.
+- An Updates page checks Shim, vJoy and HidHide against their latest GitHub releases. Shim updates apply and restart in place; driver downloads are signature-checked and installed through Windows' administrator prompt.
 
 ## Download and setup
 
-The latest build is [Shim v0.6.0](https://github.com/Rephl3x/Shim/releases/tag/v0.6.0). Each release includes its versioned ZIP and SHA-256 checksum. Extract the ZIP to a permanent folder and keep `Shim.exe` beside its `drivers` and `runtime` folders.
+The latest build is [Shim v0.7.0](https://github.com/Rephl3x/Shim/releases/tag/v0.7.0). Each release includes its versioned ZIP and SHA-256 checksum. Extract the ZIP to a permanent folder and keep `Shim.exe` beside `Shim.Updater.exe`, its `drivers`, and `runtime` folders.
 
 Windows 10/11 x64 with .NET Framework 4.8 or later is required; .NET Framework 4.8.1 is recommended where available. vJoy and HidHide are included for one-time installation; the wizard checks their status and explains when a restart or repair is needed. For the full first-run guide, controls, troubleshooting and safety details, see [the bridge guide](bridge/README.md).
 

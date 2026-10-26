@@ -32,6 +32,7 @@ namespace RigBridge
         private readonly Label forzaDiscoveryStatus = new Label { AutoSize = true };
         private readonly Button checkUpdates = Button("Check for updates");
         private readonly Label updateCheckStatus = new Label { AutoSize = true, Tag = "Muted" };
+        private readonly ToolTip updateToolTips = new ToolTip();
         private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 60 };
         private readonly string previewPath;
         private List<PhysicalDevice> available = new List<PhysicalDevice>();
@@ -63,7 +64,7 @@ namespace RigBridge
         private readonly string profilePath;
         private readonly string optionsPath;
         private ShimOptions options = new ShimOptions();
-        private bool launchingForza, scanningForza, checkingUpdates;
+        private bool launchingForza, scanningForza, checkingUpdates, updatingComponent;
         private bool syncingGain, pendingGainSave;
         private DateTime gainSaveAt;
         private string currentPage = "Drive";
@@ -132,7 +133,7 @@ namespace RigBridge
                 else if (profile.SetupVersion < SetupLogic.Version) await RunSetup();
             };
             FormClosing += (s, e) => { if (runtime != null) { e.Cancel = true; closing = true; runtime.RequestStop(); status.Text = "Stopping the bridge before closing..."; } else FlushGain(true); };
-            FormClosed += (s, e) => { timer.Dispose(); Appearance.Changed -= ApplyAppearance; };
+            FormClosed += (s, e) => { timer.Dispose(); updateToolTips.Dispose(); Appearance.Changed -= ApplyAppearance; };
             if (previewPath != null) { ShowInTaskbar = false; StartPosition = FormStartPosition.Manual; Location = new Point(-20000, -20000); }
             ApplyAppearance(); UpdateButtons();
         }
@@ -148,7 +149,7 @@ namespace RigBridge
             rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 382)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
             var brand = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Padding = new Padding(0, 7, 0, 0) };
             var brandImage = Appearance.BrandImage;
-            if (brandImage != null) brand.Controls.Add(new PictureBox { Image = brandImage, Size = new Size(82, 82), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black, Margin = new Padding(0, 0, 10, 0) });
+            if (brandImage != null) brand.Controls.Add(new PictureBox { Image = brandImage, Size = new Size(82, 82), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Transparent, Margin = new Padding(0, 0, 10, 0) });
             var brandCopy = Stack(); brandCopy.Margin = new Padding(0, 17, 0, 0);
             brandCopy.Controls.Add(new Label { Text = "Shim", Font = new Font("Segoe UI Semibold", 21), AutoSize = true, Tag = "Accent" });
             brandCopy.Controls.Add(new Label { Text = "FORZA BRIDGE", Font = new Font("Segoe UI Semibold", 8), AutoSize = true, Tag = "Muted" }); brand.Controls.Add(brandCopy); rail.Controls.Add(brand, 0, 0);
@@ -161,7 +162,7 @@ namespace RigBridge
             rail.Controls.Add(menu, 0, 1);
             var railFooter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.6.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.7.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
@@ -276,34 +277,35 @@ namespace RigBridge
         private void BuildUpdates()
         {
             var card = new SurfaceCard { Dock = DockStyle.Fill };
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.Controls.Add(Heading("Software updates"), 0, 0);
-            var actions = Flow(checkUpdates, updateCheckStatus); actions.WrapContents = true;
-            var note = Label("Checks the latest published GitHub releases for Shim, vJoy, and HidHide. Updates are never installed automatically.");
-            note.Tag = "Muted"; note.MaximumSize = new Size(880, 0); actions.Controls.Add(note); layout.Controls.Add(actions, 0, 1);
+            var actions = Flow(checkUpdates, updateCheckStatus); actions.WrapContents = false; layout.Controls.Add(actions, 0, 1);
+            var note = Label("Shim updates apply and restart. Driver installers are signature checked and use Windows approval. vJoy updates its matching SDK.");
+            note.Tag = "Muted"; note.MaximumSize = new Size(900, 0); note.Margin = new Padding(0, 10, 0, 2); layout.Controls.Add(note, 0, 2);
             var table = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 5, RowCount = 4, Margin = new Padding(0, 8, 0, 0) };
             foreach (float width in new[] { 18f, 19f, 17f, 27f, 19f }) table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
             table.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
-            foreach (string text in new[] { "Component", "Current version", "Latest release", "Status", "Source" })
+            foreach (string text in new[] { "Component", "Current version", "Latest release", "Status", "Action" })
             { var header = Label(text); header.Tag = "Muted"; header.Font = new Font("Segoe UI Semibold", 9); header.Dock = DockStyle.Fill; table.Controls.Add(header, table.Controls.Count, 0); }
-            AddUpdateRow(table, "Shim", "https://github.com/Rephl3x/Shim/releases");
-            AddUpdateRow(table, "vJoy", "https://github.com/BrunnerInnovation/vJoy/releases");
-            AddUpdateRow(table, "HidHide", "https://github.com/nefarius/HidHide/releases");
-            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true }; scroll.Controls.Add(table); layout.Controls.Add(scroll, 0, 2);
+            AddUpdateRow(table, "Shim");
+            AddUpdateRow(table, "vJoy");
+            AddUpdateRow(table, "HidHide");
+            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true }; scroll.Controls.Add(table); layout.Controls.Add(scroll, 0, 3);
             card.Controls.Add(layout); AddView("Updates", card);
         }
-        private void AddUpdateRow(TableLayoutPanel table, string name, string fallbackUrl)
+        private void AddUpdateRow(TableLayoutPanel table, string name)
         {
             int rowIndex = updateRows.Count + 1;
             table.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
-            var row = new UpdateRowControls { Name = name, ReleaseUrl = fallbackUrl };
+            var row = new UpdateRowControls { Name = name };
             row.Component = Label(name); row.Component.Font = new Font("Segoe UI Semibold", 10);
             row.Current = Cell("Not checked"); row.Latest = Cell("Not checked"); row.Status = Cell("Not checked"); row.Status.Tag = "Muted";
-            row.Open = Button("Open GitHub"); row.Open.Tag = "Ghost"; row.Open.MinimumSize = new Size(110, 40); row.Open.Enabled = false;
-            row.Open.Click += (s, e) => Open(row.ReleaseUrl);
+            row.Action = Button("Check first"); row.Action.Tag = "Ghost"; row.Action.MinimumSize = new Size(130, 40); row.Action.Enabled = false;
+            row.Action.Click += async (s, e) => await RunUpdateActionAsync(row);
             table.Controls.Add(row.Component, 0, rowIndex); table.Controls.Add(row.Current, 1, rowIndex); table.Controls.Add(row.Latest, 2, rowIndex);
-            table.Controls.Add(row.Status, 3, rowIndex); table.Controls.Add(row.Open, 4, rowIndex); updateRows.Add(row);
+            table.Controls.Add(row.Status, 3, rowIndex); table.Controls.Add(row.Action, 4, rowIndex); updateRows.Add(row);
         }
         private static Label Cell(string text)
         { return new Label { Text = text, Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 4, 8, 4) }; }
@@ -317,12 +319,20 @@ namespace RigBridge
                 foreach (var result in results)
                 {
                     var row = updateRows.First(x => x.Name == result.Name);
-                    row.Current.Text = result.Current; row.Latest.Text = result.Latest; row.Status.Text = result.Status; row.ReleaseUrl = result.ReleaseUrl;
-                    row.Status.Tag = result.Status == "Update available" ? "Accent" : result.Status == "Up to date" ? "Success" : result.Status == "Check failed" ? "Danger" : "Muted";
+                    row.Info = result; row.Download = null;
+                    row.Current.Text = result.Current; row.Latest.Text = result.Latest;
+                    row.Status.Text = result.Status == "Update available" && !String.IsNullOrEmpty(result.DownloadProblem) ? "Update unavailable" : result.Status;
+                    row.Status.AccessibleDescription = result.Details + (String.IsNullOrEmpty(result.DownloadProblem) ? "" : " " + result.DownloadProblem);
+                    updateToolTips.SetToolTip(row.Status, row.Status.AccessibleDescription);
+                    row.Status.Tag = row.Status.Text == "Update available" ? "Accent" : row.Status.Text == "Up to date" ? "Success" : row.Status.Text == "Check failed" || row.Status.Text == "Update unavailable" ? "Danger" : "Muted";
                     Appearance.Apply(row.Status);
-                    row.Open.Enabled = !String.IsNullOrWhiteSpace(row.ReleaseUrl);
-                    row.Open.AccessibleName = "Open official " + row.Name + " GitHub release page";
-                    row.Open.AccessibleDescription = result.Details;
+                    row.CanUpdate = row.Status.Text == "Update available" && String.IsNullOrEmpty(result.DownloadProblem);
+                    row.Action.Text = row.CanUpdate ? "Update now" : "Check first";
+                    row.Action.Tag = row.CanUpdate ? "Primary" : "Ghost";
+                    Appearance.Apply(row.Action);
+                    row.Action.AccessibleName = "Download and apply the " + row.Name + " update";
+                    row.Action.AccessibleDescription = result.Details + (String.IsNullOrEmpty(result.DownloadProblem) ? "" : " " + result.DownloadProblem);
+                    row.Action.Enabled = row.Status.Text == "Update available" && !checkingUpdates && runtime == null;
                 }
                 updateCheckStatus.Text = "Finished checking " + results.Count + " components.";
             }
@@ -331,9 +341,61 @@ namespace RigBridge
         }
         private sealed class UpdateRowControls
         {
-            public string Name, ReleaseUrl;
+            public string Name;
+            public bool CanUpdate;
+            public UpdateInfo Info;
+            public DownloadedUpdate Download;
             public Label Component, Current, Latest, Status;
-            public Button Open;
+            public Button Action;
+        }
+        private async Task RunUpdateActionAsync(UpdateRowControls row)
+        {
+            if (row == null || row.Info == null || updatingComponent) return;
+            if (runtime != null) { Log("Stop the bridge and restore device visibility before updating Shim or a driver."); return; }
+            updatingComponent = true; row.Action.Enabled = false;
+            try
+            {
+                if (row.Download == null)
+                {
+                    row.Action.Text = "Downloading..."; row.Status.Text = "Downloading from GitHub..."; row.Status.Tag = "Muted"; Appearance.Apply(row.Status);
+                    updateCheckStatus.Text = "Downloading and verifying " + row.Name + "...";
+                    row.Download = await UpdateInstaller.DownloadAsync(row.Info, (received, total) =>
+                    {
+                        if (IsDisposed || !IsHandleCreated) return;
+                        try { BeginInvoke(new Action(() => { if (!IsDisposed) row.Status.Text = "Downloading " + FormatBytes(received) + " / " + FormatBytes(total); })); }
+                        catch (InvalidOperationException) { }
+                    });
+                    row.Status.Text = row.Name == "Shim" ? "Package SHA-256 verified" : "Publisher, signature, and version verified";
+                    row.Status.Tag = "Success"; Appearance.Apply(row.Status);
+                }
+                if (row.Name == "Shim")
+                {
+                    string helper = UpdateInstaller.PrepareShimUpdater(row.Download.PrimaryPath, row.Info.Latest);
+                    UpdateInstaller.StartShimUpdate(helper, row.Download.PrimaryPath, Application.StartupPath);
+                    updateCheckStatus.Text = "Shim is closing to apply the update, then it will restart.";
+                }
+                else
+                {
+                    string helper = Path.Combine(Application.StartupPath, "Shim.Updater.exe");
+                    if (!File.Exists(helper)) throw new FileNotFoundException("Shim's update helper is missing. Install the latest Shim package, then try again.", helper);
+                    UpdateInstaller.StartDriverUpdate(helper, row.Download, row.Info, Application.StartupPath);
+                    updateCheckStatus.Text = row.Name + " installer is starting. Shim will reopen after it finishes.";
+                }
+                Close();
+                return;
+            }
+            catch (Exception ex)
+            {
+                row.Download = null; row.Action.Text = "Retry update"; row.Status.Text = ex.Message; row.Status.Tag = "Danger"; Appearance.Apply(row.Status);
+                row.Status.AccessibleDescription = ex.ToString(); updateToolTips.SetToolTip(row.Status, ex.Message);
+                updateCheckStatus.Text = row.Name + " update stopped. Review the row message and retry if appropriate.";
+                Log(row.Name + " update: " + ex.Message);
+            }
+            finally { updatingComponent = false; UpdateButtons(); }
+        }
+        private static string FormatBytes(long bytes)
+        {
+            return bytes >= 1024 * 1024 ? (bytes / 1048576.0).ToString("0.0") + " MB" : Math.Max(1, bytes / 1024) + " KB";
         }
         private async Task RefreshForzaTargets()
         {
@@ -617,7 +679,10 @@ namespace RigBridge
             watch.Enabled = idle && previewPath == null;
             stop.Enabled = runtime != null;
             recover.Enabled = idle && previewPath == null && File.Exists(Store.RecoveryPath);
-            checkUpdates.Enabled = !checkingUpdates && previewPath == null;
+            checkUpdates.Enabled = !checkingUpdates && !updatingComponent && previewPath == null;
+            foreach (var row in updateRows)
+                row.Action.Enabled = !checkingUpdates && !updatingComponent && runtime == null && row.Info != null &&
+                    row.CanUpdate;
             learn.Enabled = runtime != null && runtime.IsMonitorOnly && runtime.Started;
             foreach (var action in setupActions) action.Enabled = idle && previewPath == null;
             setupWizard.Enabled = idle && previewPath == null;
@@ -627,13 +692,12 @@ namespace RigBridge
         {
             try
             {
-                if (!File.Exists(DriverPackages.PathFor(vjoy))) { Open(vjoy ? "https://github.com/BrunnerInnovation/vJoy/releases" : "https://github.com/nefarius/HidHide/releases"); return; }
+                if (!File.Exists(DriverPackages.PathFor(vjoy))) { Log("The bundled installer is missing. Re-extract the latest Shim package and reopen setup."); return; }
                 DriverSetup.Install(vjoy);
                 Log("Started the official " + (vjoy ? "vJoy" : "HidHide") + " installer. Follow its setup wizard; restart if requested, then click Check drivers.");
             }
             catch (Exception ex) { Log("Driver setup: " + ex.Message); }
         }
-        private void Open(string url) { try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch (Exception ex) { Log(ex.Message); } }
         private void Log(string message)
         {
             string line = DateTime.Now.ToString("HH:mm:ss") + "  " + message;

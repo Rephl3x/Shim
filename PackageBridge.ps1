@@ -9,10 +9,10 @@ else { & (Join-Path $PSScriptRoot 'BuildBridge.ps1') -Test -OutputDirectory $out
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bridge\README.md') -Destination (Join-Path $outputDirectory 'README.md') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bridge\THIRD-PARTY-NOTICES.md') -Destination (Join-Path $outputDirectory 'THIRD-PARTY-NOTICES.md') -Force
 $packageEntries = [Collections.Generic.List[object]]::new()
-foreach ($name in @('Shim.exe', 'README.md', 'THIRD-PARTY-NOTICES.md', 'dependencies.lock.json')) {
+foreach ($name in @('Shim.exe', 'Shim.Updater.exe', 'README.md', 'THIRD-PARTY-NOTICES.md', 'dependencies.lock.json')) {
     $packageEntries.Add(@{Source=(Join-Path $outputDirectory $name); Entry=$name})
 }
-$packageEntries.Add(@{Source=(Join-Path $PSScriptRoot 'assets\shim-repo-icon-512.png'); Entry='assets/shim-repo-icon-512.png'})
+$packageEntries.Add(@{Source=(Join-Path $PSScriptRoot 'assets\shim-app-mark-transparent.png'); Entry='assets/shim-app-mark-transparent.png'})
 foreach ($folder in @('drivers', 'runtime', 'licenses')) {
     foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $outputDirectory $folder) -File -Recurse)) {
         $packageEntries.Add(@{Source=$file.FullName; Entry=$file.FullName.Substring($outputDirectory.Length + 1).Replace('\', '/')})
@@ -32,7 +32,7 @@ $checksumsPath = Join-Path $outputDirectory 'SHA256SUMS.txt'
 $hashLines | Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 $packageEntries.Add(@{Source=$checksumsPath; Entry='SHA256SUMS.txt'})
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zipPath = Join-Path $PSScriptRoot 'dist\Shim-0.6.0.zip'
+$zipPath = Join-Path $PSScriptRoot 'dist\Shim-0.7.0.zip'
 New-Item -ItemType Directory -Path (Split-Path -Parent $zipPath) -Force | Out-Null
 # Overwrite only this exact output file. No recursive cleanup is used.
 $stream = [IO.File]::Open($zipPath, [IO.FileMode]::Create, [IO.FileAccess]::ReadWrite)

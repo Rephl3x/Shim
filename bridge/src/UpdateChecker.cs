@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -21,19 +22,33 @@ namespace RigBridge
         public string Latest { get; set; }
         public string Status { get; set; }
         public string Details { get; set; }
-        public string ReleaseUrl { get; set; }
+        public string DownloadUrl { get; set; }
+        public string AssetName { get; set; }
+        public long AssetSize { get; set; }
+        public string Sha256 { get; set; }
+        public string CompanionDownloadUrl { get; set; }
+        public string CompanionAssetName { get; set; }
+        public long CompanionAssetSize { get; set; }
+        public string DownloadProblem { get; set; }
     }
 
     public static class UpdateChecker
     {
         private sealed class Source
         {
-            public string Name, Repository, FallbackUrl, Current, ComparisonVersion;
+            public string Name, Repository, Current, ComparisonVersion;
         }
 
         private sealed class Release
         {
-            public string Tag, Url, Error;
+            public string Tag, Error;
+            public Asset Primary, Companion;
+        }
+
+        private sealed class Asset
+        {
+            public string Name, Url, Digest;
+            public long Size;
         }
 
         public static Task<List<UpdateInfo>> CheckAsync()
@@ -75,16 +90,16 @@ namespace RigBridge
                 : vjoyVersion + (vjoySdk == null ? " driver" : " driver (SDK " + vjoySdk + ")");
             return new List<Source>
             {
-                new Source { Name = "Shim", Repository = "Rephl3x/Shim", FallbackUrl = "https://github.com/Rephl3x/Shim/releases", Current = shimVersion, ComparisonVersion = shimVersion },
-                new Source { Name = "vJoy", Repository = "BrunnerInnovation/vJoy", FallbackUrl = "https://github.com/BrunnerInnovation/vJoy/releases", Current = vjoyCurrent, ComparisonVersion = vjoyVersion },
-                new Source { Name = "HidHide", Repository = "nefarius/HidHide", FallbackUrl = "https://github.com/nefarius/HidHide/releases", Current = FileVersion(hidhidePath), ComparisonVersion = FileVersion(hidhidePath) }
+                new Source { Name = "Shim", Repository = "Rephl3x/Shim", Current = shimVersion, ComparisonVersion = shimVersion },
+                new Source { Name = "vJoy", Repository = "BrunnerInnovation/vJoy", Current = vjoyCurrent, ComparisonVersion = vjoyVersion },
+                new Source { Name = "HidHide", Repository = "nefarius/HidHide", Current = FileVersion(hidhidePath), ComparisonVersion = FileVersion(hidhidePath) }
             };
         }
 
         private static UpdateInfo BuildInfo(Source source, Release release)
         {
             var result = new UpdateInfo { Name = source.Name, Current = source.Current ?? "Not detected", CurrentVersion = source.ComparisonVersion,
-                Latest = release.Tag ?? "Unavailable", ReleaseUrl = release.Url ?? source.FallbackUrl };
+                Latest = release.Tag ?? "Unavailable" };
             if (!String.IsNullOrEmpty(release.Error))
             {
                 result.Status = "Check failed"; result.Details = release.Error;
@@ -98,8 +113,18 @@ namespace RigBridge
                 result.Status = CompareStatus(source.ComparisonVersion, release.Tag);
                 result.Details = result.Status == "Update available" ? "A newer published version is available on GitHub." :
                     result.Status == "Installed version is newer" ? "The local version is newer than the latest release tag." :
-                    result.Status == "Not detected" ? "No installed driver version was found. The release page contains download details." :
-                    result.Status == "Version format differs" ? "Could not compare these version strings safely. Review the release page." : "The installed version matches the latest published release.";
+                    result.Status == "Not detected" ? "No installed driver version was found." :
+                    result.Status == "Version format differs" ? "Could not compare these version strings safely." : "The installed version matches the latest published release.";
+                result.DownloadUrl = release.Primary == null ? null : release.Primary.Url;
+                result.AssetName = release.Primary == null ? null : release.Primary.Name;
+                result.AssetSize = release.Primary == null ? 0 : release.Primary.Size;
+                result.Sha256 = release.Primary == null ? null : release.Primary.Digest;
+                result.CompanionDownloadUrl = release.Companion == null ? null : release.Companion.Url;
+                result.CompanionAssetName = release.Companion == null ? null : release.Companion.Name;
+                result.CompanionAssetSize = release.Companion == null ? 0 : release.Companion.Size;
+                if (release.Primary == null) result.DownloadProblem = "This release does not contain the expected update package.";
+                else if (source.Name == "Shim" && !IsSha256(release.Primary.Digest)) result.DownloadProblem = "GitHub did not provide a SHA-256 digest for this Shim package, so Shim cannot apply it safely.";
+                else if (source.Name == "vJoy" && release.Companion == null) result.DownloadProblem = "This vJoy release does not include the SDK needed to keep its driver and Shim library matched.";
             }
             return result;
         }
@@ -116,10 +141,23 @@ namespace RigBridge
                 using (var reader = new StreamReader(stream, Encoding.UTF8))
                 {
                     var json = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(reader.ReadToEnd());
-                    string tag = Value(json, "tag_name"), url = Value(json, "html_url");
+                    string tag = Value(json, "tag_name");
                     if (String.IsNullOrWhiteSpace(tag)) return new Release { Error = "GitHub returned a release without a version tag." };
-                    if (!IsGitHubReleaseUrl(url)) url = source.FallbackUrl;
-                    return new Release { Tag = tag, Url = url };
+                    var assets = ReadAssets(json);
+                    Asset primary = null, companion = null;
+                    if (source.Name == "Shim")
+                    {
+                        string version = tag.TrimStart('v', 'V');
+                        primary = assets.FirstOrDefault(a => String.Equals(a.Name, "Shim-" + version + ".zip", StringComparison.OrdinalIgnoreCase));
+                    }
+                    else if (source.Name == "vJoy")
+                    {
+                        primary = assets.FirstOrDefault(a => a.Name.StartsWith("vJoySetup_", StringComparison.OrdinalIgnoreCase) && a.Name.EndsWith("_Win10_Win11.exe", StringComparison.OrdinalIgnoreCase));
+                        companion = assets.FirstOrDefault(a => String.Equals(a.Name, "SDK.zip", StringComparison.OrdinalIgnoreCase));
+                    }
+                    else if (source.Name == "HidHide")
+                        primary = assets.FirstOrDefault(a => a.Name.StartsWith("HidHide_", StringComparison.OrdinalIgnoreCase) && a.Name.EndsWith("_x64.exe", StringComparison.OrdinalIgnoreCase));
+                    return new Release { Tag = tag, Primary = primary, Companion = companion };
                 }
             }
             catch (WebException ex)
@@ -136,12 +174,32 @@ namespace RigBridge
         private static string Value(IDictionary<string, object> json, string key)
         { object value; return json != null && json.TryGetValue(key, out value) ? Convert.ToString(value) : null; }
 
-        private static bool IsGitHubReleaseUrl(string value)
+        private static List<Asset> ReadAssets(IDictionary<string, object> release)
+        {
+            object value;
+            var items = new List<Asset>();
+            if (release == null || !release.TryGetValue("assets", out value)) return items;
+            var collection = value as IEnumerable;
+            if (collection == null) return items;
+            foreach (object entry in collection)
+            {
+                var asset = entry as IDictionary<string, object>; if (asset == null) continue;
+                string name = Value(asset, "name"), url = Value(asset, "browser_download_url"), digest = Value(asset, "digest");
+                object sizeValue; long size = asset.TryGetValue("size", out sizeValue) ? Convert.ToInt64(sizeValue) : 0;
+                if (!String.IsNullOrWhiteSpace(name) && IsGitHubAssetUrl(url)) items.Add(new Asset { Name = name, Url = url, Digest = digest, Size = size });
+            }
+            return items;
+        }
+
+        private static bool IsGitHubAssetUrl(string value)
         {
             Uri uri;
             return Uri.TryCreate(value, UriKind.Absolute, out uri) && uri.Scheme == Uri.UriSchemeHttps &&
-                String.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) && uri.AbsolutePath.Contains("/releases/");
+                String.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) && uri.AbsolutePath.Contains("/releases/download/");
         }
+
+        private static bool IsSha256(string value)
+        { return !String.IsNullOrWhiteSpace(value) && Regex.IsMatch(value, @"^sha256:[a-fA-F0-9]{64}$"); }
 
         private static bool TryVersion(string value, out Version version)
         {
