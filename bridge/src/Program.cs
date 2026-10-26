@@ -56,6 +56,11 @@ namespace RigBridge
                 }
                 string preview = args.Length >= 2 && args.Length <= 4 && args[0] == "--preview" ? args[1] : null;
                 if (args.Length > 0 && preview == null) throw new ArgumentException("Usage: Shim.exe [--diagnose report.json | --restore-visibility report.json | --preview image.png | --preview-wizard image.png page]");
+                if (preview != null)
+                {
+                    using (var form = new BridgeForm(preview, args.Length >= 3 ? args[2] : null, args.Length >= 4 ? args[3] : null)) Application.Run(form);
+                    return 0;
+                }
                 using (var mutex = new Mutex(false, "Local\\FHRigBridge-" + System.Security.Principal.WindowsIdentity.GetCurrent().User.Value))
                 {
                     bool owns = false;

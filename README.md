@@ -18,14 +18,16 @@ The bridge reads physical controls through DirectInput, maps them to a configura
 - Game force feedback is forwarded from the virtual controller to the selected physical wheel. Gain can be adjusted while the bridge is running without resetting the connection or effects.
 - HidHide visibility recovery restores selected physical devices when the bridge stops or recovers from an interrupted session.
 - Day and Night appearance modes, a Drive dashboard, driver status and activity logs are included.
+- Shim's check-engine transmission graphic and black-and-orange accent palette carry through the main app and first-run setup; Day and Night modes remain available.
+- Start Forza from the Drive screen, with an option to start the bridge and wait until it is ready before opening the game.
 
 ## Download and setup
 
-The latest build is [Shim v0.3.3](https://github.com/Rephl3x/Shim/releases/tag/v0.3.3). Each release includes its versioned ZIP and SHA-256 checksum. Extract the ZIP to a permanent folder and keep `Shim.exe` beside its `drivers` and `runtime` folders.
+The latest build is [Shim v0.5.0](https://github.com/Rephl3x/Shim/releases/tag/v0.5.0). Each release includes its versioned ZIP and SHA-256 checksum. Extract the ZIP to a permanent folder and keep `Shim.exe` beside its `drivers` and `runtime` folders.
 
 Windows 10/11 x64 with .NET Framework 4.8 or later is required; .NET Framework 4.8.1 is recommended where available. vJoy and HidHide are included for one-time installation; the wizard checks their status and explains when a restart or repair is needed. For the full first-run guide, controls, troubleshooting and safety details, see [the bridge guide](bridge/README.md).
 
-After setup, start the bridge before launching Forza. Create a custom wheel profile in Forza and bind it to the virtual controller. The app does not inject into the game, patch game files or change USB device order.
+After setup, use **Start Forza** on Drive to launch the game. Enable **Start bridge when I click Start Forza** under Options for a one-click bridge-and-game startup. Create a custom wheel profile in Forza and bind it to the virtual controller. The app does not inject into the game, patch game files or change USB device order.
 
 ## Build from source
 

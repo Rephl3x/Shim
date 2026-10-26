@@ -142,9 +142,12 @@ namespace RigBridge
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 204)); root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             var rail = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18, 30, 18, 20), RowCount = 4, ColumnCount = 1, Tag = "Surface" };
             rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 330)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
-            var brand = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
-            brand.Controls.Add(new Label { Text = "Shim", Font = new Font("Segoe UI Semibold", 27), AutoSize = true, Tag = "Accent" });
-            brand.Controls.Add(new Label { Text = "FORZA BRIDGE", Font = new Font("Segoe UI Semibold", 9), AutoSize = true, Tag = "Muted" }); rail.Controls.Add(brand, 0, 0);
+            var brand = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Padding = new Padding(0, 7, 0, 0) };
+            var brandImage = Appearance.BrandImage;
+            if (brandImage != null) brand.Controls.Add(new PictureBox { Image = brandImage, Size = new Size(82, 82), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black, Margin = new Padding(0, 0, 10, 0) });
+            var brandCopy = Stack(); brandCopy.Margin = new Padding(0, 17, 0, 0);
+            brandCopy.Controls.Add(new Label { Text = "Shim", Font = new Font("Segoe UI Semibold", 21), AutoSize = true, Tag = "Accent" });
+            brandCopy.Controls.Add(new Label { Text = "FORZA BRIDGE", Font = new Font("Segoe UI Semibold", 8), AutoSize = true, Tag = "Muted" }); brand.Controls.Add(brandCopy); rail.Controls.Add(brand, 0, 0);
             var menu = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             foreach (string name in new[] { "Drive", "Mappings", "Live inputs", "Drivers", "Options", "Activity" })
             {
@@ -154,7 +157,7 @@ namespace RigBridge
             rail.Controls.Add(menu, 0, 1);
             var railFooter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.4.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.5.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };

@@ -4,6 +4,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Reflection;
 
 namespace RigBridge
 {
@@ -16,12 +17,12 @@ namespace RigBridge
         {
             bool dark = mode == "Night";
             return new Palette { Night = dark,
-                Background = ColorTranslator.FromHtml(dark ? "#0E1521" : "#F3F6FA"), Surface = ColorTranslator.FromHtml(dark ? "#172131" : "#FFFFFF"),
-                Raised = ColorTranslator.FromHtml(dark ? "#1E2B3E" : "#EEF3F9"), Input = ColorTranslator.FromHtml(dark ? "#111B2A" : "#F7F9FC"),
-                Border = ColorTranslator.FromHtml(dark ? "#2B394D" : "#E0E6EF"), Text = ColorTranslator.FromHtml(dark ? "#E9EFF8" : "#19283C"),
-                Muted = ColorTranslator.FromHtml(dark ? "#A0AFC3" : "#60718A"), Accent = ColorTranslator.FromHtml(dark ? "#74A9FF" : "#2767CF"),
-                AccentSoft = ColorTranslator.FromHtml(dark ? "#223D62" : "#E8F0FF"), Success = ColorTranslator.FromHtml(dark ? "#75D4B3" : "#167B5B"),
-                Danger = ColorTranslator.FromHtml(dark ? "#FFA7A7" : "#B83F44"), DangerSoft = ColorTranslator.FromHtml(dark ? "#3B2733" : "#FFF0F1") };
+                Background = ColorTranslator.FromHtml(dark ? "#101010" : "#F4F3F1"), Surface = ColorTranslator.FromHtml(dark ? "#191919" : "#FFFFFF"),
+                Raised = ColorTranslator.FromHtml(dark ? "#242321" : "#EFEDE9"), Input = ColorTranslator.FromHtml(dark ? "#121212" : "#FAF9F7"),
+                Border = ColorTranslator.FromHtml(dark ? "#383632" : "#E3DFD8"), Text = ColorTranslator.FromHtml(dark ? "#F5F2EC" : "#27231D"),
+                Muted = ColorTranslator.FromHtml(dark ? "#B2AAA0" : "#746C62"), Accent = ColorTranslator.FromHtml(dark ? "#FF981A" : "#A85500"),
+                AccentSoft = ColorTranslator.FromHtml(dark ? "#402807" : "#FFF0D9"), Success = ColorTranslator.FromHtml(dark ? "#75D4A3" : "#167B4D"),
+                Danger = ColorTranslator.FromHtml(dark ? "#FFAAA0" : "#AE3D32"), DangerSoft = ColorTranslator.FromHtml(dark ? "#3B2421" : "#FFF0ED") };
         }
     }
     public static class Appearance
@@ -29,6 +30,19 @@ namespace RigBridge
         private static bool loaded;
         public static string Mode { get; private set; }
         public static Palette Colors { get; private set; }
+        private static Image brandImage;
+        public static Image BrandImage
+        {
+            get
+            {
+                if (brandImage == null)
+                {
+                    using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Shim.Graphics.Brand.png"))
+                        if (stream != null) using (Image source = Image.FromStream(stream)) brandImage = new Bitmap(source);
+                }
+                return brandImage;
+            }
+        }
         public static event Action Changed;
         public static string Path { get { return System.IO.Path.Combine(Store.DirectoryPath, "appearance.json"); } }
         static Appearance() { Mode = "Day"; Colors = Palette.For(Mode); }
@@ -146,7 +160,7 @@ namespace RigBridge
         {
             var p = Appearance.Colors; string role = Tag as string; bool primary = role == "Primary", active = role == "Active", danger = role == "Danger", plain = role == "Nav" || role == "Ghost";
             Color fill = !Enabled ? p.Raised : primary ? p.Accent : active ? p.AccentSoft : danger ? p.DangerSoft : plain ? (Parent == null ? p.Background : Parent.BackColor) : p.Surface;
-            Color ink = !Enabled ? p.Muted : primary ? (p.Night ? Color.FromArgb(15, 30, 50) : Color.White) : active ? p.Accent : danger ? p.Danger : p.Text;
+            Color ink = !Enabled ? p.Muted : primary ? (p.Night ? Color.FromArgb(22, 17, 10) : Color.White) : active ? p.Accent : danger ? p.Danger : p.Text;
             if (Enabled && (hover || pressed)) fill = ControlPaint.Light(fill, pressed ? 0.12f : 0.06f);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; e.Graphics.Clear(Parent == null ? p.Background : Parent.BackColor);
             using (var path = Appearance.Rounded(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 8))
