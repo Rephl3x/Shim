@@ -13,6 +13,7 @@ foreach ($name in @('Shim.exe', 'Shim.Updater.exe', 'README.md', 'THIRD-PARTY-NO
     $packageEntries.Add(@{Source=(Join-Path $outputDirectory $name); Entry=$name})
 }
 $packageEntries.Add(@{Source=(Join-Path $PSScriptRoot 'assets\shim-app-mark-transparent.png'); Entry='assets/shim-app-mark-transparent.png'})
+$packageEntries.Add(@{Source=(Join-Path $PSScriptRoot 'assets\shim-app-icon.ico'); Entry='assets/shim-app-icon.ico'})
 foreach ($folder in @('drivers', 'runtime', 'licenses')) {
     foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $outputDirectory $folder) -File -Recurse)) {
         $packageEntries.Add(@{Source=$file.FullName; Entry=$file.FullName.Substring($outputDirectory.Length + 1).Replace('\', '/')})
@@ -32,7 +33,7 @@ $checksumsPath = Join-Path $outputDirectory 'SHA256SUMS.txt'
 $hashLines | Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 $packageEntries.Add(@{Source=$checksumsPath; Entry='SHA256SUMS.txt'})
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zipPath = Join-Path $PSScriptRoot 'dist\Shim-0.7.0.zip'
+$zipPath = Join-Path $PSScriptRoot 'dist\Shim-0.7.1.zip'
 New-Item -ItemType Directory -Path (Split-Path -Parent $zipPath) -Force | Out-Null
 # Overwrite only this exact output file. No recursive cleanup is used.
 $stream = [IO.File]::Open($zipPath, [IO.FileMode]::Create, [IO.FileAccess]::ReadWrite)

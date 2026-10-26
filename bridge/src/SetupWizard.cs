@@ -60,7 +60,7 @@ namespace RigBridge
             original = SetupLogic.Clone(current); draft = SetupLogic.Clone(current);
             this.previewPath = previewPath; this.previewStep = previewStep; preview = previewPath != null;
             devices = found.Where(d => !d.Virtual).ToList();
-            Text = "Shim - set up your rig"; Font = new Font("Segoe UI", 10); BackColor = Color.FromArgb(243, 246, 250);
+            Text = "Shim - set up your rig"; Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); Font = new Font("Segoe UI", 10); BackColor = Color.FromArgb(243, 246, 250);
             ClientSize = new Size(1000, 790); MinimumSize = new Size(920, 740); AutoScaleMode = AutoScaleMode.Dpi; StartPosition = FormStartPosition.CenterParent;
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 1, RowCount = 5 };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
