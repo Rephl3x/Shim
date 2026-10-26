@@ -107,18 +107,22 @@ namespace RigBridge.Tests
         {
             string directory = Path.Combine(Path.GetTempPath(), "FHRigBridge-desktop-" + Guid.NewGuid().ToString("N"));
             string path = Path.Combine(directory, "profile.json");
+            string optionsPath = Path.Combine(directory, "options.json");
             var original = File.Exists(Store.ProfilePath) ? Store.Read<BridgeProfile>(Store.ProfilePath) : new BridgeProfile(); original.SetupVersion = SetupLogic.Version;
             Store.Write(path, original);
             try
             {
-                using (var main = new BridgeForm(null, null, null, path))
+                using (var main = new BridgeForm(null, null, null, path, optionsPath))
                 {
                     main.ShowInTaskbar = false; main.StartPosition = FormStartPosition.Manual; main.Location = new Point(-20000, -20000); main.Show();
-                    Pump(() => !Field<bool>(main, "scanning") && Field<System.Collections.Generic.List<PhysicalDevice>>(main, "available").Count > 0, "main window discovery");
+                    Pump(() => !Field<bool>(main, "scanning") && !Field<bool>(main, "scanningForza") && Field<System.Collections.Generic.List<PhysicalDevice>>(main, "available").Count > 0, "main window discovery");
                     var navigation = Field<System.Collections.Generic.Dictionary<string, Button>>(main, "navigation");
                     var views = Field<System.Collections.Generic.Dictionary<string, Control>>(main, "views");
-                    foreach (string name in new[] { "Mappings", "Drivers", "Live inputs", "Activity", "Drive" })
+                    foreach (string name in new[] { "Mappings", "Drivers", "Options", "Live inputs", "Activity", "Drive" })
                     { navigation[name].PerformClick(); Assert(views[name].Visible, "Navigation did not reveal " + name); }
+                    Field<CheckBox>(main, "startBridgeWithForza").Checked = true;
+                    Pump(() => File.Exists(optionsPath) && Store.Read<ShimOptions>(optionsPath).StartBridgeWithForza, "saved Forza bridge-start option");
+                    Assert(Store.Read<ShimOptions>(optionsPath).StartBridgeWithForza, "Forza bridge-start option was not persisted");
                     Field<Button>(main, "night").PerformClick();
                     Assert(Appearance.Mode == "Night" && Store.Read<UiPreferences>(Appearance.Path).Mode == "Night", "Night preference not saved");
                     Assert(Field<DataGridView>(main, "mappings").BackgroundColor == Appearance.Colors.Surface, "Hidden mappings page did not receive Night colors");
@@ -130,7 +134,7 @@ namespace RigBridge.Tests
                     Assert(Field<StrengthSlider>(main, "strength").AccessibilityObject.Value == target + "%", "Accessible strength value out of sync");
                     main.Close();
                 }
-                Console.WriteLine("PASS Desktop: navigation, Day/Night persistence, contrast, strength display and isolated automatic saving");
+                Console.WriteLine("PASS Desktop: navigation, Forza option persistence, Day/Night, contrast, strength display and isolated automatic saving");
             }
             finally { if (File.Exists(path)) File.Delete(path); if (Directory.Exists(directory)) Directory.Delete(directory); }
         }

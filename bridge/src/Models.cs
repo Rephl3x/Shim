@@ -132,6 +132,7 @@ namespace RigBridge
     {
         public static string DirectoryPath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FHRigBridge"); } }
         public static string ProfilePath { get { return Path.Combine(DirectoryPath, "profile.json"); } }
+        public static string OptionsPath { get { return Path.Combine(DirectoryPath, "options.json"); } }
         public static string RecoveryPath { get { return Path.Combine(DirectoryPath, "hiding-recovery.json"); } }
         public static void SaveStrength(string path, int value, BridgeProfile fallback)
         {

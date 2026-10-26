@@ -29,6 +29,7 @@ namespace RigBridge
         public string FfbStatus { get; private set; }
         public bool Running { get { return thread.IsAlive; } }
         public bool Started { get; private set; }
+        public bool Stopping { get { return stop.WaitOne(0); } }
         public bool IsMonitorOnly { get { return monitorOnly; } }
         public bool CanChangeGain { get { return !monitorOnly && profile.EnableFfb && Running && !stop.WaitOne(0); } }
         public int AppliedGain { get { return Volatile.Read(ref appliedGain); } }

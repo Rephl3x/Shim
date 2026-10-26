@@ -25,7 +25,11 @@ namespace RigBridge
         private readonly ComboBox outputControl = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 175 };
         private readonly CheckBox invertAxis = new CheckBox { Text = "Invert axis", AutoSize = true };
         private readonly NumericUpDown deadzone = new NumericUpDown { Minimum = 0, Maximum = 40, Width = 50 };
-        private readonly Button start = Button("Start bridge"), stop = Button("Stop / restore devices"), watch = Button("Monitor inputs"), refresh = Button("Refresh devices"), save = Button("Save profile"), learn = Button("Learn selected output"), autoButtons = Button("Map all buttons"), remove = Button("Remove mapping"), recover = Button("Restore visibility");
+        private readonly Button startForza = Button("Start Forza"), start = Button("Start bridge"), stop = Button("Stop / restore devices"), watch = Button("Monitor inputs"), refresh = Button("Refresh devices"), save = Button("Save profile"), learn = Button("Learn selected output"), autoButtons = Button("Map all buttons"), remove = Button("Remove mapping"), recover = Button("Restore visibility");
+        private readonly ComboBox forzaTarget = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 380 };
+        private readonly CheckBox startBridgeWithForza = new CheckBox { Text = "Start bridge when I click Start Forza", AutoSize = true };
+        private readonly Button refreshForzaTargets = Button("Find installed games");
+        private readonly Label forzaDiscoveryStatus = new Label { AutoSize = true };
         private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 60 };
         private readonly string previewPath;
         private List<PhysicalDevice> available = new List<PhysicalDevice>();
@@ -54,14 +58,19 @@ namespace RigBridge
         private readonly Dictionary<string, Button> navigation = new Dictionary<string, Button>();
         private readonly string previewPage;
         private readonly string profilePath;
+        private readonly string optionsPath;
+        private ShimOptions options = new ShimOptions();
+        private bool launchingForza, scanningForza;
         private bool syncingGain, pendingGainSave;
         private DateTime gainSaveAt;
         private string currentPage = "Drive";
         public BridgeForm(string previewPath, string previewMode = null, string previewPage = null)
-            : this(previewPath, previewMode, previewPage, Store.ProfilePath) { }
+            : this(previewPath, previewMode, previewPage, Store.ProfilePath, Store.OptionsPath) { }
         internal BridgeForm(string previewPath, string previewMode, string previewPage, string profilePath)
+            : this(previewPath, previewMode, previewPage, profilePath, Store.OptionsPath) { }
+        internal BridgeForm(string previewPath, string previewMode, string previewPage, string profilePath, string optionsPath)
         {
-            this.previewPath = previewPath; this.previewPage = previewPage; this.profilePath = profilePath;
+            this.previewPath = previewPath; this.previewPage = previewPage; this.profilePath = profilePath; this.optionsPath = optionsPath;
             Appearance.Load(); if (previewMode != null) Appearance.Set(previewMode, false);
             Text = "Shim"; Font = new Font("Segoe UI", 10);
             ClientSize = new Size(1280, 860); MinimumSize = new Size(1120, 790); AutoScaleMode = AutoScaleMode.Dpi;
@@ -70,14 +79,22 @@ namespace RigBridge
             if (File.Exists(profilePath))
                 try { profile = Store.Read<BridgeProfile>(profilePath) ?? new BridgeProfile(); }
                 catch (Exception ex) { Log("Could not load the profile: " + ex.Message); }
+            if (File.Exists(optionsPath))
+                try { options = Store.Read<ShimOptions>(optionsPath) ?? new ShimOptions(); }
+                catch (Exception ex) { Log("Could not load Options: " + ex.Message); }
             Build();
             enableFfb.Checked = profile.EnableFfb; invert.Checked = profile.InvertFfb;
             virtualId.Value = Math.Max(1, Math.Min(16, profile.VirtualId));
             strength.Value = Math.Max(0, Math.Min(100, profile.FfbGain)); strengthValue.Text = strength.Value + "%";
             dll.Text = String.IsNullOrEmpty(profile.VjoyDll) ? Vjoy.DefaultDll : profile.VjoyDll;
+            startBridgeWithForza.Checked = options.StartBridgeWithForza;
             refresh.Click += async (s, e) => await RefreshAsync();
             save.Click += (s, e) => SaveProfile();
             setupWizard.Click += async (s, e) => await RunSetup();
+            startForza.Click += async (s, e) => await StartForzaAsync();
+            startBridgeWithForza.CheckedChanged += (s, e) => SaveOptions();
+            forzaTarget.SelectedIndexChanged += (s, e) => SaveOptions();
+            refreshForzaTargets.Click += async (s, e) => await RefreshForzaTargets();
             strength.ValueChanged += (s, e) => GainChanged(strength.Value);
             day.Click += (s, e) => ChangeMode("Day"); night.Click += (s, e) => ChangeMode("Night");
             Appearance.Changed += ApplyAppearance;
@@ -101,6 +118,7 @@ namespace RigBridge
             timer.Tick += (s, e) => TickRuntime(); timer.Start();
             Shown += async (s, e) => {
                 await RefreshAsync();
+                if (previewPath == null) await RefreshForzaTargets();
                 if (previewPath != null)
                 {
                     if (this.previewPage != null) ShowView(this.previewPage);
@@ -123,12 +141,12 @@ namespace RigBridge
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 204)); root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             var rail = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18, 30, 18, 20), RowCount = 4, ColumnCount = 1, Tag = "Surface" };
-            rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 278)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
+            rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 330)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
             var brand = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             brand.Controls.Add(new Label { Text = "Shim", Font = new Font("Segoe UI Semibold", 27), AutoSize = true, Tag = "Accent" });
             brand.Controls.Add(new Label { Text = "FORZA BRIDGE", Font = new Font("Segoe UI Semibold", 9), AutoSize = true, Tag = "Muted" }); rail.Controls.Add(brand, 0, 0);
             var menu = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
-            foreach (string name in new[] { "Drive", "Mappings", "Live inputs", "Drivers", "Activity" })
+            foreach (string name in new[] { "Drive", "Mappings", "Live inputs", "Drivers", "Options", "Activity" })
             {
                 string target = name; var button = Button(name); button.AutoSize = false; button.Size = new Size(168, 44); button.TextAlign = ContentAlignment.MiddleLeft; button.Margin = new Padding(0, 0, 0, 8);
                 button.Click += (s, e) => ShowView(target); navigation.Add(name, button); menu.Controls.Add(button);
@@ -136,7 +154,7 @@ namespace RigBridge
             rail.Controls.Add(menu, 0, 1);
             var railFooter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.3.3"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.4.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
@@ -146,11 +164,12 @@ namespace RigBridge
             day.Padding = night.Padding = new Padding(3, 0, 3, 0);
             header.Controls.Add(Flow(day, night), 1, 0); content.Controls.Add(header, 0, 0); content.Controls.Add(deck, 0, 1);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 18, 0, 0) };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 286));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 420));
             status.Tag = "Muted"; status.AutoEllipsis = true; footer.Controls.Add(status, 0, 0);
             start.Tag = "Primary"; stop.Tag = "Danger"; start.Text = "Start bridge"; stop.Text = "Stop bridge"; start.MinimumSize = new Size(124, 42); stop.MinimumSize = new Size(124, 42);
-            footer.Controls.Add(Flow(start, stop), 1, 0); content.Controls.Add(footer, 0, 2); root.Controls.Add(content, 1, 0); Controls.Add(root);
-            BuildDrive(); BuildMappings(); BuildDrivers();
+            startForza.Tag = "Primary"; startForza.Text = "Start Forza"; startForza.MinimumSize = new Size(124, 42);
+            footer.Controls.Add(Flow(startForza, start, stop), 1, 0); content.Controls.Add(footer, 0, 2); root.Controls.Add(content, 1, 0); Controls.Add(root);
+            BuildDrive(); BuildMappings(); BuildDrivers(); BuildOptions();
             var liveCard = new SurfaceCard { Dock = DockStyle.Fill }; liveCard.Controls.Add(monitor); AddView("Live inputs", liveCard);
             var activityCard = new SurfaceCard { Dock = DockStyle.Fill }; activityCard.Controls.Add(log); AddView("Activity", activityCard);
             status.Text = "Ready. Start the bridge, then launch Forza."; ShowView("Drive");
@@ -164,7 +183,7 @@ namespace RigBridge
             if (!views.ContainsKey(name)) return; currentPage = name;
             foreach (var item in views) item.Value.Visible = item.Key == name;
             views[name].BringToFront(); pageTitle.Text = name == "Drive" ? "Your rig" : name;
-            pageHint.Text = name == "Drive" ? "One virtual wheel. Ready for the next drive." : name == "Mappings" ? "Connect each physical control to your virtual wheel." : name == "Live inputs" ? "Readings from your selected devices." : name == "Drivers" ? "One-time setup and advanced connection settings." : "Session events and force feedback diagnostics.";
+            pageHint.Text = name == "Drive" ? "One virtual wheel. Ready for the next drive." : name == "Mappings" ? "Connect each physical control to your virtual wheel." : name == "Live inputs" ? "Readings from your selected devices." : name == "Drivers" ? "One-time setup and advanced connection settings." : name == "Options" ? "Choose how Shim launches your Forza game." : "Session events and force feedback diagnostics.";
             foreach (var item in navigation) item.Value.Tag = item.Key == name ? "Active" : "Nav";
             Appearance.Apply(this);
         }
@@ -232,6 +251,90 @@ namespace RigBridge
             setup.Controls.Add(Heading("Advanced")); setup.Controls.Add(Flow(Label("vJoy library"), dll, choose)); setup.Controls.Add(recover);
             var hint = Label("Device visibility is restored on stop. If Pit House needs access while bridging, add it to HidHide's Applications list. Keep Forza off that list."); hint.Tag = "Muted"; hint.MaximumSize = new Size(810, 0); setup.Controls.Add(hint);
             card.Controls.Add(setup); AddView("Drivers", card);
+        }
+        private void BuildOptions()
+        {
+            var card = new SurfaceCard { Dock = DockStyle.Fill };
+            var layout = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+            layout.Controls.Add(Heading("Forza launch"));
+            var targetLabel = Label("Game to start"); targetLabel.Tag = "Muted";
+            layout.Controls.Add(Flow(targetLabel, forzaTarget, refreshForzaTargets));
+            layout.Controls.Add(startBridgeWithForza);
+            var note = Label("When enabled, Start Forza starts the bridge if needed, waits for it to report Running, then opens the selected game. If bridge startup fails, the game is left closed.");
+            note.Tag = "Muted"; note.MaximumSize = new Size(830, 0); note.Margin = new Padding(0, 0, 0, 18); layout.Controls.Add(note);
+            forzaDiscoveryStatus.Text = "Shim can find installed Forza games from the Xbox app, Steam, and Start Menu shortcuts.";
+            forzaDiscoveryStatus.Tag = "Muted"; forzaDiscoveryStatus.MaximumSize = new Size(830, 0); layout.Controls.Add(forzaDiscoveryStatus);
+            card.Controls.Add(layout); AddView("Options", card);
+        }
+        private async Task RefreshForzaTargets()
+        {
+            if (scanningForza) return;
+            scanningForza = true; refreshForzaTargets.Enabled = false;
+            forzaDiscoveryStatus.Text = "Searching this PC for installed Forza games...";
+            try
+            {
+                await Task.Yield();
+                string previous = options.ForzaTargetId;
+                var found = ForzaLauncher.Discover();
+                forzaTarget.BeginUpdate(); forzaTarget.Items.Clear();
+                foreach (var target in found) forzaTarget.Items.Add(target);
+                forzaTarget.EndUpdate();
+                ForzaGameTarget selected = found.FirstOrDefault(x => x.Id == previous) ?? found.FirstOrDefault();
+                if (selected != null)
+                {
+                    forzaTarget.SelectedItem = selected;
+                    forzaDiscoveryStatus.Text = found.Count + " installed Forza game" + (found.Count == 1 ? "" : "s") + " found. Choose the title Start Forza should open.";
+                }
+                else
+                {
+                    options.ForzaTargetId = null;
+                    forzaDiscoveryStatus.Text = "No installed Forza game was found. Install it through the Xbox app or Steam, or add its shortcut to the Start Menu, then search again.";
+                }
+            }
+            catch (Exception ex) { forzaDiscoveryStatus.Text = "Could not search for installed games: " + ex.Message; }
+            finally { scanningForza = false; SaveOptions(); UpdateButtons(); }
+        }
+        private void SaveOptions()
+        {
+            if (previewPath != null || scanningForza) return;
+            options.StartBridgeWithForza = startBridgeWithForza.Checked;
+            var target = forzaTarget.SelectedItem as ForzaGameTarget;
+            options.ForzaTargetId = target == null ? null : target.Id;
+            try { Store.Write(optionsPath, options); }
+            catch (Exception ex) { Log("Options could not be saved: " + ex.Message); }
+            UpdateButtons();
+        }
+        private async Task StartForzaAsync()
+        {
+            if (launchingForza || previewPath != null) return;
+            ForzaGameTarget target = forzaTarget.SelectedItem as ForzaGameTarget;
+            if (target == null) { Log("Choose an installed Forza game in Options, then click Start Forza."); return; }
+            launchingForza = true; UpdateButtons();
+            try
+            {
+                if (options.StartBridgeWithForza)
+                {
+                    if (runtime != null && runtime.IsMonitorOnly)
+                        throw new InvalidOperationException("Stop input monitoring before using Start Forza with bridge auto-start enabled.");
+                    if (runtime == null)
+                    {
+                        Start(false);
+                        if (runtime == null) throw new InvalidOperationException("Shim could not start the bridge. Check the Activity page and resolve the bridge error first.");
+                    }
+                    DateTime deadline = DateTime.UtcNow.AddSeconds(30);
+                    while (runtime != null && runtime.Running && !runtime.Started && !runtime.Stopping && DateTime.UtcNow < deadline)
+                        await Task.Delay(100);
+                    if (runtime == null || !runtime.Running || !runtime.Started || runtime.Stopping)
+                    {
+                        if (runtime != null && !runtime.Started && runtime.Running) runtime.RequestStop();
+                        throw new InvalidOperationException("The bridge did not reach Running state, so Forza was not launched. Check Activity for the startup error.");
+                    }
+                }
+                ForzaLauncher.Launch(target);
+                Log("Started " + target.DisplayName + (options.StartBridgeWithForza ? " after the bridge was ready." : "."));
+            }
+            catch (Exception ex) { Log("Forza launch: " + ex.Message); }
+            finally { launchingForza = false; UpdateButtons(); }
         }
         private void ChangeMode(string mode)
         { try { Appearance.Set(mode, previewPath == null); } catch (Exception ex) { Log("Appearance could not be saved: " + ex.Message); } }
@@ -437,6 +540,11 @@ namespace RigBridge
             devices.Enabled = wheel.Enabled = enableFfb.Enabled = invert.Enabled = virtualId.Enabled = dll.Enabled = refresh.Enabled = save.Enabled = autoButtons.Enabled = remove.Enabled = idle;
             strength.Enabled = !scanning && (runtime == null || runtime.CanChangeGain);
             start.Enabled = idle && previewPath == null && profile.Devices.Count > 0 && profile.Bindings.Count > 0 && !File.Exists(Store.RecoveryPath);
+            bool canAutoStartBridge = runtime != null ? !runtime.IsMonitorOnly && !runtime.Stopping : idle && profile.Devices.Count > 0 && profile.Bindings.Count > 0 && !File.Exists(Store.RecoveryPath);
+            startForza.Enabled = previewPath == null && !launchingForza && !scanningForza && forzaTarget.SelectedItem != null && (!options.StartBridgeWithForza || canAutoStartBridge);
+            startBridgeWithForza.Enabled = idle && !launchingForza && previewPath == null;
+            forzaTarget.Enabled = !launchingForza && !scanningForza && previewPath == null;
+            refreshForzaTargets.Enabled = !launchingForza && !scanningForza && previewPath == null;
             watch.Enabled = idle && previewPath == null;
             stop.Enabled = runtime != null;
             recover.Enabled = idle && previewPath == null && File.Exists(Store.RecoveryPath);

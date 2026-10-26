@@ -31,7 +31,7 @@ $checksumsPath = Join-Path $outputDirectory 'SHA256SUMS.txt'
 $hashLines | Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 $packageEntries.Add(@{Source=$checksumsPath; Entry='SHA256SUMS.txt'})
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zipPath = Join-Path $PSScriptRoot 'dist\Shim-0.3.3.zip'
+$zipPath = Join-Path $PSScriptRoot 'dist\Shim-0.4.0.zip'
 New-Item -ItemType Directory -Path (Split-Path -Parent $zipPath) -Force | Out-Null
 # Overwrite only this exact output file. No recursive cleanup is used.
 $stream = [IO.File]::Open($zipPath, [IO.FileMode]::Create, [IO.FileAccess]::ReadWrite)

@@ -337,6 +337,32 @@ namespace RigBridge.Tests
                 try { Store.Write(path, Profile()); var copy = Store.Read<BridgeProfile>(path); copy.FfbGain = 40; Store.Write(path, copy); Assert(Store.Read<BridgeProfile>(path).FfbGain == 40, "Atomic replacement lost state"); }
                 finally { if (File.Exists(path)) File.Delete(path); if (File.Exists(path + ".tmp")) File.Delete(path + ".tmp"); if (Directory.Exists(directory)) Directory.Delete(directory); }
             });
+            Test("Forza launch detection accepts Horizon and Motorsport titles only", () => {
+                Assert(ForzaLauncher.IsForzaGameName("Forza Horizon 6") && ForzaLauncher.IsForzaGameName("Forza Horizon 5 Premium Edition") && ForzaLauncher.IsForzaGameName("Forza Motorsport"), "Supported Forza title was missed");
+                Assert(!ForzaLauncher.IsForzaGameName("Forza Hub") && !ForzaLauncher.IsForzaGameName("Horizon 6") && !ForzaLauncher.IsForzaGameName("Forza Street"), "Non-game or unsupported title was included");
+            });
+            Test("Start Forza builds safe Xbox and Steam launch requests", () => {
+                var xbox = ForzaLauncher.CreateStartInfo(new ForzaGameTarget { Id = "app:Microsoft.ForzaHorizon6_8wekyb3d8bbwe!ForzaHorizon6", Value = "Microsoft.ForzaHorizon6_8wekyb3d8bbwe!ForzaHorizon6" });
+                Assert(xbox.FileName == "explorer.exe" && xbox.Arguments.Contains("shell:AppsFolder") && xbox.UseShellExecute, "Xbox launch did not use the installed app identity");
+                var steam = ForzaLauncher.CreateStartInfo(new ForzaGameTarget { Id = "steam:2483190", Value = "2483190" });
+                Assert(steam.FileName == "steam://rungameid/2483190" && steam.UseShellExecute, "Steam launch URI was incorrect");
+                Throws(() => ForzaLauncher.CreateStartInfo(new ForzaGameTarget { Id = "steam:1", Value = "1" }));
+                Throws(() => ForzaLauncher.CreateStartInfo(new ForzaGameTarget { Id = "app:anything", Value = "bad value!unsafe" }));
+            });
+            Test("Forza option starts the bridge only when requested and not already running", () => {
+                Assert(ForzaLauncher.ShouldStartBridge(true, false), "Enabled auto-start did not start the bridge");
+                Assert(!ForzaLauncher.ShouldStartBridge(false, false) && !ForzaLauncher.ShouldStartBridge(true, true), "Bridge was restarted unnecessarily");
+            });
+            Test("Shim launch options survive atomic replacement", () => {
+                string directory = Path.Combine(Path.GetTempPath(), "FHRigBridge-options-" + Guid.NewGuid().ToString("N")); string path = Path.Combine(directory, "options.json");
+                try
+                {
+                    Store.Write(path, new ShimOptions { StartBridgeWithForza = true, ForzaTargetId = "steam:2483190" });
+                    var loaded = Store.Read<ShimOptions>(path);
+                    Assert(loaded.StartBridgeWithForza && loaded.ForzaTargetId == "steam:2483190", "Forza options did not persist");
+                }
+                finally { if (File.Exists(path)) File.Delete(path); if (File.Exists(path + ".tmp")) File.Delete(path + ".tmp"); if (Directory.Exists(directory)) Directory.Delete(directory); }
+            });
             Test("Saving strength preserves stored mappings instead of saving unrelated UI edits", () => {
                 string directory = Path.Combine(Path.GetTempPath(), "FHRigBridge-gain-" + Guid.NewGuid().ToString("N")); string path = Path.Combine(directory, "profile.json");
                 try
