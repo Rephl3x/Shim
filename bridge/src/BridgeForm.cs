@@ -30,6 +30,8 @@ namespace RigBridge
         private readonly CheckBox startBridgeWithForza = new CheckBox { Text = "Start bridge when I click Start Forza", AutoSize = true };
         private readonly Button refreshForzaTargets = Button("Find installed games");
         private readonly Label forzaDiscoveryStatus = new Label { AutoSize = true };
+        private readonly Button checkUpdates = Button("Check for updates");
+        private readonly Label updateCheckStatus = new Label { AutoSize = true, Tag = "Muted" };
         private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 60 };
         private readonly string previewPath;
         private List<PhysicalDevice> available = new List<PhysicalDevice>();
@@ -42,6 +44,7 @@ namespace RigBridge
         private Dictionary<string, InputState> baseline;
         private readonly string logPath;
         private readonly List<Control> setupActions = new List<Control>();
+        private readonly List<UpdateRowControls> updateRows = new List<UpdateRowControls>();
         private readonly Button setupWizard = Button("Set up my rig");
         private readonly StrengthSlider strength = new StrengthSlider { Dock = DockStyle.Fill };
         private readonly Label strengthValue = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 36) };
@@ -60,7 +63,7 @@ namespace RigBridge
         private readonly string profilePath;
         private readonly string optionsPath;
         private ShimOptions options = new ShimOptions();
-        private bool launchingForza, scanningForza;
+        private bool launchingForza, scanningForza, checkingUpdates;
         private bool syncingGain, pendingGainSave;
         private DateTime gainSaveAt;
         private string currentPage = "Drive";
@@ -92,6 +95,7 @@ namespace RigBridge
             save.Click += (s, e) => SaveProfile();
             setupWizard.Click += async (s, e) => await RunSetup();
             startForza.Click += async (s, e) => await StartForzaAsync();
+            checkUpdates.Click += async (s, e) => await CheckForUpdatesAsync();
             startBridgeWithForza.CheckedChanged += (s, e) => SaveOptions();
             forzaTarget.SelectedIndexChanged += (s, e) => SaveOptions();
             refreshForzaTargets.Click += async (s, e) => await RefreshForzaTargets();
@@ -141,7 +145,7 @@ namespace RigBridge
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 204)); root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             var rail = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18, 30, 18, 20), RowCount = 4, ColumnCount = 1, Tag = "Surface" };
-            rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 330)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
+            rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 382)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
             var brand = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Padding = new Padding(0, 7, 0, 0) };
             var brandImage = Appearance.BrandImage;
             if (brandImage != null) brand.Controls.Add(new PictureBox { Image = brandImage, Size = new Size(82, 82), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black, Margin = new Padding(0, 0, 10, 0) });
@@ -149,7 +153,7 @@ namespace RigBridge
             brandCopy.Controls.Add(new Label { Text = "Shim", Font = new Font("Segoe UI Semibold", 21), AutoSize = true, Tag = "Accent" });
             brandCopy.Controls.Add(new Label { Text = "FORZA BRIDGE", Font = new Font("Segoe UI Semibold", 8), AutoSize = true, Tag = "Muted" }); brand.Controls.Add(brandCopy); rail.Controls.Add(brand, 0, 0);
             var menu = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
-            foreach (string name in new[] { "Drive", "Mappings", "Live inputs", "Drivers", "Options", "Activity" })
+            foreach (string name in new[] { "Drive", "Mappings", "Live inputs", "Drivers", "Options", "Updates", "Activity" })
             {
                 string target = name; var button = Button(name); button.AutoSize = false; button.Size = new Size(168, 44); button.TextAlign = ContentAlignment.MiddleLeft; button.Margin = new Padding(0, 0, 0, 8);
                 button.Click += (s, e) => ShowView(target); navigation.Add(name, button); menu.Controls.Add(button);
@@ -157,7 +161,7 @@ namespace RigBridge
             rail.Controls.Add(menu, 0, 1);
             var railFooter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.5.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.6.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
@@ -172,7 +176,7 @@ namespace RigBridge
             start.Tag = "Primary"; stop.Tag = "Danger"; start.Text = "Start bridge"; stop.Text = "Stop bridge"; start.MinimumSize = new Size(124, 42); stop.MinimumSize = new Size(124, 42);
             startForza.Tag = "Primary"; startForza.Text = "Start Forza"; startForza.MinimumSize = new Size(124, 42);
             footer.Controls.Add(Flow(startForza, start, stop), 1, 0); content.Controls.Add(footer, 0, 2); root.Controls.Add(content, 1, 0); Controls.Add(root);
-            BuildDrive(); BuildMappings(); BuildDrivers(); BuildOptions();
+            BuildDrive(); BuildMappings(); BuildDrivers(); BuildOptions(); BuildUpdates();
             var liveCard = new SurfaceCard { Dock = DockStyle.Fill }; liveCard.Controls.Add(monitor); AddView("Live inputs", liveCard);
             var activityCard = new SurfaceCard { Dock = DockStyle.Fill }; activityCard.Controls.Add(log); AddView("Activity", activityCard);
             status.Text = "Ready. Start the bridge, then launch Forza."; ShowView("Drive");
@@ -186,7 +190,7 @@ namespace RigBridge
             if (!views.ContainsKey(name)) return; currentPage = name;
             foreach (var item in views) item.Value.Visible = item.Key == name;
             views[name].BringToFront(); pageTitle.Text = name == "Drive" ? "Your rig" : name;
-            pageHint.Text = name == "Drive" ? "One virtual wheel. Ready for the next drive." : name == "Mappings" ? "Connect each physical control to your virtual wheel." : name == "Live inputs" ? "Readings from your selected devices." : name == "Drivers" ? "One-time setup and advanced connection settings." : name == "Options" ? "Choose how Shim launches your Forza game." : "Session events and force feedback diagnostics.";
+            pageHint.Text = name == "Drive" ? "One virtual wheel. Ready for the next drive." : name == "Mappings" ? "Connect each physical control to your virtual wheel." : name == "Live inputs" ? "Readings from your selected devices." : name == "Drivers" ? "One-time setup and advanced connection settings." : name == "Options" ? "Choose how Shim launches your Forza game." : name == "Updates" ? "Check current versions against published GitHub releases." : name == "Activity" ? "Session events and force feedback diagnostics." : "";
             foreach (var item in navigation) item.Value.Tag = item.Key == name ? "Active" : "Nav";
             Appearance.Apply(this);
         }
@@ -268,6 +272,68 @@ namespace RigBridge
             forzaDiscoveryStatus.Text = "Shim can find installed Forza games from the Xbox app, Steam, and Start Menu shortcuts.";
             forzaDiscoveryStatus.Tag = "Muted"; forzaDiscoveryStatus.MaximumSize = new Size(830, 0); layout.Controls.Add(forzaDiscoveryStatus);
             card.Controls.Add(layout); AddView("Options", card);
+        }
+        private void BuildUpdates()
+        {
+            var card = new SurfaceCard { Dock = DockStyle.Fill };
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            layout.Controls.Add(Heading("Software updates"), 0, 0);
+            var actions = Flow(checkUpdates, updateCheckStatus); actions.WrapContents = true;
+            var note = Label("Checks the latest published GitHub releases for Shim, vJoy, and HidHide. Updates are never installed automatically.");
+            note.Tag = "Muted"; note.MaximumSize = new Size(880, 0); actions.Controls.Add(note); layout.Controls.Add(actions, 0, 1);
+            var table = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 5, RowCount = 4, Margin = new Padding(0, 8, 0, 0) };
+            foreach (float width in new[] { 18f, 19f, 17f, 27f, 19f }) table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
+            table.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+            foreach (string text in new[] { "Component", "Current version", "Latest release", "Status", "Source" })
+            { var header = Label(text); header.Tag = "Muted"; header.Font = new Font("Segoe UI Semibold", 9); header.Dock = DockStyle.Fill; table.Controls.Add(header, table.Controls.Count, 0); }
+            AddUpdateRow(table, "Shim", "https://github.com/Rephl3x/Shim/releases");
+            AddUpdateRow(table, "vJoy", "https://github.com/BrunnerInnovation/vJoy/releases");
+            AddUpdateRow(table, "HidHide", "https://github.com/nefarius/HidHide/releases");
+            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true }; scroll.Controls.Add(table); layout.Controls.Add(scroll, 0, 2);
+            card.Controls.Add(layout); AddView("Updates", card);
+        }
+        private void AddUpdateRow(TableLayoutPanel table, string name, string fallbackUrl)
+        {
+            int rowIndex = updateRows.Count + 1;
+            table.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
+            var row = new UpdateRowControls { Name = name, ReleaseUrl = fallbackUrl };
+            row.Component = Label(name); row.Component.Font = new Font("Segoe UI Semibold", 10);
+            row.Current = Cell("Not checked"); row.Latest = Cell("Not checked"); row.Status = Cell("Not checked"); row.Status.Tag = "Muted";
+            row.Open = Button("Open GitHub"); row.Open.Tag = "Ghost"; row.Open.MinimumSize = new Size(110, 40); row.Open.Enabled = false;
+            row.Open.Click += (s, e) => Open(row.ReleaseUrl);
+            table.Controls.Add(row.Component, 0, rowIndex); table.Controls.Add(row.Current, 1, rowIndex); table.Controls.Add(row.Latest, 2, rowIndex);
+            table.Controls.Add(row.Status, 3, rowIndex); table.Controls.Add(row.Open, 4, rowIndex); updateRows.Add(row);
+        }
+        private static Label Cell(string text)
+        { return new Label { Text = text, Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 4, 8, 4) }; }
+        private async Task CheckForUpdatesAsync()
+        {
+            if (checkingUpdates || previewPath != null) return;
+            checkingUpdates = true; checkUpdates.Text = "Checking..."; updateCheckStatus.Text = "Contacting GitHub for the latest published releases..."; UpdateButtons();
+            try
+            {
+                var results = await UpdateChecker.CheckAsync();
+                foreach (var result in results)
+                {
+                    var row = updateRows.First(x => x.Name == result.Name);
+                    row.Current.Text = result.Current; row.Latest.Text = result.Latest; row.Status.Text = result.Status; row.ReleaseUrl = result.ReleaseUrl;
+                    row.Status.Tag = result.Status == "Update available" ? "Accent" : result.Status == "Up to date" ? "Success" : result.Status == "Check failed" ? "Danger" : "Muted";
+                    Appearance.Apply(row.Status);
+                    row.Open.Enabled = !String.IsNullOrWhiteSpace(row.ReleaseUrl);
+                    row.Open.AccessibleName = "Open official " + row.Name + " GitHub release page";
+                    row.Open.AccessibleDescription = result.Details;
+                }
+                updateCheckStatus.Text = "Finished checking " + results.Count + " components.";
+            }
+            catch (Exception ex) { updateCheckStatus.Text = "Update check failed: " + ex.Message; }
+            finally { checkingUpdates = false; checkUpdates.Text = "Check for updates"; UpdateButtons(); }
+        }
+        private sealed class UpdateRowControls
+        {
+            public string Name, ReleaseUrl;
+            public Label Component, Current, Latest, Status;
+            public Button Open;
         }
         private async Task RefreshForzaTargets()
         {
@@ -551,6 +617,7 @@ namespace RigBridge
             watch.Enabled = idle && previewPath == null;
             stop.Enabled = runtime != null;
             recover.Enabled = idle && previewPath == null && File.Exists(Store.RecoveryPath);
+            checkUpdates.Enabled = !checkingUpdates && previewPath == null;
             learn.Enabled = runtime != null && runtime.IsMonitorOnly && runtime.Started;
             foreach (var action in setupActions) action.Enabled = idle && previewPath == null;
             setupWizard.Enabled = idle && previewPath == null;

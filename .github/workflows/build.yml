@@ -35,7 +35,7 @@ jobs:
           path: |
             artifacts/build/Shim.exe
             artifacts/build/Shim.Tests.exe
-            dist/Shim-0.5.0.zip
-            dist/Shim-0.5.0.zip.sha256
+            dist/Shim-0.6.0.zip
+            dist/Shim-0.6.0.zip.sha256
           if-no-files-found: error
           retention-days: 14

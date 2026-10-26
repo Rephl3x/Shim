@@ -66,7 +66,7 @@ namespace RigBridge
         {
             var p = Colors; string role = root.Tag as string;
             Color background = role == "Surface" || root is SurfaceCard ? p.Surface : role == "Raised" ? p.Raised : role == "Page" || root is Form ? p.Background : root.Parent == null ? p.Background : root.Parent.BackColor;
-            root.BackColor = background; root.ForeColor = role == "Muted" ? p.Muted : role == "Accent" ? p.Accent : role == "Danger" ? p.Danger : p.Text;
+            root.BackColor = background; root.ForeColor = role == "Muted" ? p.Muted : role == "Accent" ? p.Accent : role == "Success" ? p.Success : role == "Danger" ? p.Danger : p.Text;
             var label = root as Label; if (label != null) label.UseMnemonic = false;
             var box = root as TextBox;
             if (box != null) { box.BackColor = p.Input; box.ForeColor = p.Text; box.BorderStyle = BorderStyle.None; }
