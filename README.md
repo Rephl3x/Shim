@@ -70,3 +70,7 @@ Local builds write temporary files to `build` and the current installer, ZIP, an
 
 For help or a bug report, use [GitHub Issues](https://github.com/Rephl3x/Shim/issues).
 
+## Say thanks
+
+Shim is free and open source. If it has helped with your rig, you can [buy me a coffee](https://buymeacoffee.com/amslabs). Support is optional; feedback and bug reports help too.
+
