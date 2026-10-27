@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "shim-support-reports",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-27",
+  "workers_dev": false,
+  "vars": {
+    "ACCESS_AUD": "72cd66704a9e2e2840fa998d79c0e24ae51691fcac1e6e93aa1ad88cccc41d66"
+  },
+  "routes": [
+    { "pattern": "dev.amslabs.net", "custom_domain": true }
+  ],
+  "r2_buckets": [
+    { "binding": "SUPPORT_REPORTS", "bucket_name": "shim-support-reports" }
+  ],
+  "ratelimits": [
+    { "name": "REPORT_LIMIT", "namespace_id": "8462917315", "simple": { "limit": 5, "period": 60 } }
+  ],
+  "triggers": { "crons": ["0 0 * * *"] },
+  "observability": { "enabled": true, "head_sampling_rate": 1 }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "shim-support-reports",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "deploy": "cf deploy",
+    "check": "cf deploy --dry-run"
+  },
+  "devDependencies": {
+    "cf": "^1.0.0-beta.23",
+    "wrangler": "4.153.0"
+  },
+  "type": "module"
+}
