@@ -13,7 +13,7 @@ Version 0.7.1 added the Shim logo to the Windows executable icon, title bar and 
 - **Drive** keeps start/stop, your included devices, FFB packet/start counters and strength together. Move the strength slider while the bridge is running: the worker changes the wheel's gain without resetting effects, vJoy or device connections. The game's own gain still multiplies this limit; game mute/pause is respected. Strength saves automatically after you finish adjusting it. 0% mutes force while retaining the active effects; raising it restores the same effects. Before starting, the slider sets the strength for the next session.
 - **Day / Night** at the top right changes the appearance immediately and remembers your choice. The wizard uses the same setting. Appearance changes do not reconnect devices.
 - **Mappings** contains device selection, read-only input monitoring, learning and manual profile saves. **Live inputs** shows readings. **Drivers** contains driver health and connection settings. **Activity** contains detailed session/FFB logs.
-- **Start Forza** launches a discovered Forza title. In **Options**, enable **Start the bridge before Forza** to have Shim start the bridge and wait for its Running state before launching the selected game. If bridge startup fails or times out, the game is not launched.
+- **Start Forza** launches a discovered Forza title. In **Options**, enable **Start bridge when I click Start Forza** to have Shim start the bridge and wait for its Running state before launching the selected game. If bridge startup fails or times out, the game is not launched.
 - **Updates** checks Shim, vJoy and HidHide against their latest published GitHub releases. Click **Update now** to download and apply Shim, or to download a publisher-verified driver installer and open its Windows administrator prompt. vJoy's matching SDK library is updated with its driver. Shim will not run a driver installer whose signature or publisher does not verify.
 
 The strength slider supports mouse dragging, arrow keys in 1% steps, Page Up/Down in 5% steps and Home/End. Its current percentage is exposed to accessibility clients. Enabling/disabling forwarding, changing the target wheel or changing force inversion still requires stopping the bridge.
@@ -31,11 +31,11 @@ Version 0.2.2 fixes **Update physical FFB effect failed (0x800704DF)**. That cod
 - `licenses`: upstream license texts. `THIRD-PARTY-NOTICES.md` identifies the components and sources.
 - Our source, tests, dependency lock file and rebuild/package scripts.
 
-Windows 10/11 **x64** with .NET Framework 4.8 or later is required; .NET Framework 4.8.1 is recommended where available. Shim itself needs no installer. Drivers need a one-time installation and may request a Windows restart. Driver installation/configuration starts when you click its button in setup. Shim does not disable USB devices, patch game files, inject into the game, or change USB controller order.
+Windows 10/11 **x64** with .NET Framework 4.8 or later is required; .NET Framework 4.8.1 is recommended where available. Use the Windows setup installer or run Shim from an extracted portable ZIP. Setup installs missing drivers; portable users can install them from Shim's wizard. Drivers may request a Windows restart. The vJoy slot is configured only at the wizard's final Save step. Shim does not disable USB devices, patch game files, inject into the game, or change USB controller order.
 
 ## First setup
 
-1. Extract the entire ZIP to a permanent local folder. Keep the EXE beside the `drivers` and `runtime` folders.
+1. Run the Windows installer, or extract the entire portable ZIP to a permanent local folder and keep the EXE beside the `drivers` and `runtime` folders.
 2. Open the app. The **six-step setup wizard** opens automatically for a new or older profile. You can reopen it any time with **Set up my rig**.
 3. On **Drivers**, install vJoy and HidHide if needed. Their pinned hashes are checked before Windows launches the official installers. Finish each installer and restart Windows if requested. The final **Finish setup** action configures the selected vJoy slot after calibration, verifies the layout, then saves the profile. This uses vJoy's installed `vJoyConfig.exe` to replace only that slot's layout: all eight axes, 128 buttons, four continuous POV hats and the eleven supported FFB effects. It refreshes vJoy, so close games and other feeders first. Other vJoy slots are not deleted/reset.
 4. On **Devices**, choose the wheel, pedal source, clutch, H-pattern shifter/gear count/reverse, sequential shifter/paddles and analog handbrake. Choose **None / not fitted** for optional equipment you do not use. Pedals plugged into the wheelbase use the wheelbase as their source. Tick additional button boxes/controllers you want included and hidden. Devices chosen for a role are already included.
@@ -49,7 +49,7 @@ You can continue selecting/calibrating devices while installation finishes. **Sa
 
 HidHide must use normal mode. Review any old inactive hiding rules in **HidHide Configuration Client**. If Pit House needs access while bridging, add Pit House to its Applications list. Keep Forza off that list. If driver/DLL versions differ, finish installation/restart and use a matching pair; the bundled DLL matches vJoy 2.2.2.0.
 
-The installers' Windows signatures were verified during packaging. The bridge EXE itself is unsigned. Upstream driver installers retain their own publisher identities and licenses.
+The vendor driver installers' Windows signatures were verified during packaging. Shim's app and setup executables are unsigned. Upstream driver installers retain their own publisher identities and licenses.
 
 ## Advanced mapping (optional after the wizard)
 
@@ -152,7 +152,7 @@ The build uses Windows' built-in .NET Framework C# compiler. No NuGet packages a
 An optional desktop smoke check exercises main-window navigation, Day/Night changes, strength display and automatic saving to an isolated temporary profile. It also uses a connected FFB wheel for read-only wizard input polling, including back navigation, required-control validation, final readiness, cancellation and resume. Previous appearance preferences/setup drafts are restored, and the active profile must remain unchanged:
 
 ```powershell
-.\dist\bridge\Shim.Tests.exe --desktop
+.\build\bridge\Shim.Tests.exe --desktop
 ```
 
 Read-only diagnostics and offscreen UI preview:
