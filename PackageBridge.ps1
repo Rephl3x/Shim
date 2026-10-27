@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([string]$OutputDirectory, [switch]$SkipTests)
 $ErrorActionPreference = 'Stop'
-if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $PSScriptRoot 'dist\bridge' }
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $PSScriptRoot 'build\payload' }
 $outputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 & (Join-Path $PSScriptRoot 'FetchBridgeDependencies.ps1') -OutputDirectory $outputDirectory
 if ($SkipTests) { & (Join-Path $PSScriptRoot 'BuildBridge.ps1') -OutputDirectory $outputDirectory }
@@ -33,8 +33,9 @@ $checksumsPath = Join-Path $outputDirectory 'SHA256SUMS.txt'
 $hashLines | Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 $packageEntries.Add(@{Source=$checksumsPath; Entry='SHA256SUMS.txt'})
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zipPath = Join-Path $PSScriptRoot 'dist\Shim-0.7.1.zip'
-New-Item -ItemType Directory -Path (Split-Path -Parent $zipPath) -Force | Out-Null
+$distributionDirectory = Join-Path $PSScriptRoot 'dist\latest'
+$zipPath = Join-Path $distributionDirectory 'Shim-0.8.0.zip'
+New-Item -ItemType Directory -Path $distributionDirectory -Force | Out-Null
 # Overwrite only this exact output file. No recursive cleanup is used.
 $stream = [IO.File]::Open($zipPath, [IO.FileMode]::Create, [IO.FileAccess]::ReadWrite)
 $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create)

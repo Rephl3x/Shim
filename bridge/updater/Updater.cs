@@ -219,8 +219,8 @@ namespace RigBridge.Update
         private static bool Allowed(string relative)
         {
             string first = relative.Split('\\')[0];
-            if (new[] { "drivers", "runtime", "licenses", "assets", "bridge" }.Contains(first, StringComparer.OrdinalIgnoreCase)) return true;
-            return new[] { "Shim.exe", "Shim.Updater.exe", "README.md", "THIRD-PARTY-NOTICES.md", "dependencies.lock.json", "SHA256SUMS.txt", "BuildBridge.ps1", "FetchBridgeDependencies.ps1", "PackageBridge.ps1" }.Contains(relative, StringComparer.OrdinalIgnoreCase);
+            if (new[] { "drivers", "runtime", "licenses", "assets", "bridge", "installer" }.Contains(first, StringComparer.OrdinalIgnoreCase)) return true;
+            return new[] { "Shim.exe", "Shim.Updater.exe", "README.md", "THIRD-PARTY-NOTICES.md", "dependencies.lock.json", "SHA256SUMS.txt", "BuildBridge.ps1", "BuildInstaller.ps1", "FetchBridgeDependencies.ps1", "PackageBridge.ps1" }.Contains(relative, StringComparer.OrdinalIgnoreCase);
         }
 
         private static void EnsureInside(string root, string path)

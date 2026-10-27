@@ -8,7 +8,7 @@ using System.Reflection;
 
 namespace RigBridge
 {
-    public sealed class UiPreferences { public string Mode { get; set; } public UiPreferences() { Mode = "Day"; } }
+    public sealed class UiPreferences { public int ConfigVersion { get; set; } public string Mode { get; set; } public UiPreferences() { Mode = "Day"; } }
     public sealed class Palette
     {
         public Color Background, Surface, Raised, Input, Border, Text, Muted, Accent, AccentSoft, Success, Danger, DangerSoft;
@@ -28,6 +28,7 @@ namespace RigBridge
     public static class Appearance
     {
         private static bool loaded;
+        private static bool persistenceBlocked;
         public static string Mode { get; private set; }
         public static Palette Colors { get; private set; }
         private static Image brandImage;
@@ -49,15 +50,17 @@ namespace RigBridge
         public static void Load()
         {
             if (loaded) return; loaded = true;
-            try { if (File.Exists(Path)) { var preferences = Store.Read<UiPreferences>(Path); if (preferences != null) Set(preferences.Mode, false); } }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-            catch (ArgumentException) { }
-            catch (InvalidOperationException) { }
+            try { if (File.Exists(Path)) { var preferences = Store.LoadAppearance(Path); if (preferences != null) Set(preferences.Mode, false); } }
+            catch (InvalidDataException) { persistenceBlocked = true; }
+            catch (IOException) { persistenceBlocked = true; }
+            catch (UnauthorizedAccessException) { persistenceBlocked = true; }
+            catch (ArgumentException) { persistenceBlocked = true; }
+            catch (InvalidOperationException) { persistenceBlocked = true; }
         }
         public static void Set(string mode, bool save)
         {
             if (mode != "Day" && mode != "Night") throw new ArgumentException("Choose Day or Night mode.");
+            if (save && persistenceBlocked) throw new InvalidDataException("Shim could not safely read saved appearance settings, so it will not overwrite that file. Update Shim or back up the file before resetting settings.");
             if (save) Store.Write(Path, new UiPreferences { Mode = mode });
             Mode = mode; Colors = Palette.For(mode);
             var changed = Changed; if (changed != null) changed();

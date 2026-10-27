@@ -50,7 +50,7 @@ namespace RigBridge
                 if (args.Length >= 2 && args[0] == "--preview-wizard")
                 {
                     Appearance.Load(); if (args.Length >= 4) Appearance.Set(args[3], false);
-                    BridgeProfile saved = File.Exists(Store.ProfilePath) ? Store.Read<BridgeProfile>(Store.ProfilePath) : new BridgeProfile();
+                    BridgeProfile saved = File.Exists(Store.ProfilePath) ? Store.LoadProfile(Store.ProfilePath, new BridgeProfile()) : new BridgeProfile();
                     using (var direct = new DirectInput()) Application.Run(new SetupWizard(saved, direct.Enumerate(), args[1], args.Length >= 3 ? Int32.Parse(args[2]) : 0));
                     return 0;
                 }

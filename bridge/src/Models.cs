@@ -48,6 +48,7 @@ namespace RigBridge
     }
     public sealed class BridgeProfile
     {
+        public int ConfigVersion { get; set; }
         public int SetupVersion { get; set; }
         public RigChoices Rig { get; set; }
         public List<string> Devices { get; set; }
@@ -130,10 +131,78 @@ namespace RigBridge
     }
     public static class Store
     {
+        private const int CurrentProfileConfigVersion = 1;
+        private const int CurrentOptionsConfigVersion = 1;
+        private const int CurrentAppearanceConfigVersion = 1;
         public static string DirectoryPath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FHRigBridge"); } }
         public static string ProfilePath { get { return Path.Combine(DirectoryPath, "profile.json"); } }
         public static string OptionsPath { get { return Path.Combine(DirectoryPath, "options.json"); } }
         public static string RecoveryPath { get { return Path.Combine(DirectoryPath, "hiding-recovery.json"); } }
+        public static BridgeProfile LoadProfile(string path, BridgeProfile fallback)
+        {
+            var profile = File.Exists(path) ? Read<BridgeProfile>(path) : SetupLogic.Clone(fallback);
+            if (profile == null) throw new InvalidDataException("The saved profile could not be read.");
+            MigrateProfile(path, profile); return profile;
+        }
+        public static ShimOptions LoadOptions(string path)
+        {
+            var options = File.Exists(path) ? Read<ShimOptions>(path) : new ShimOptions();
+            if (options == null) throw new InvalidDataException("Saved Options could not be read.");
+            MigrateOptions(path, options); return options;
+        }
+        public static UiPreferences LoadAppearance(string path)
+        {
+            var preferences = File.Exists(path) ? Read<UiPreferences>(path) : new UiPreferences();
+            if (preferences == null) throw new InvalidDataException("Saved appearance preferences could not be read.");
+            if (preferences.ConfigVersion > CurrentAppearanceConfigVersion) throw new InvalidDataException("Appearance preferences were saved by a newer Shim version. Update Shim before editing them.");
+            if (preferences.ConfigVersion < CurrentAppearanceConfigVersion)
+            {
+                CreateConfigBackup(path, preferences.ConfigVersion);
+                preferences.ConfigVersion = CurrentAppearanceConfigVersion;
+                Write(path, preferences);
+            }
+            return preferences;
+        }
+        private static void MigrateProfile(string path, BridgeProfile profile)
+        {
+            if (profile.ConfigVersion > CurrentProfileConfigVersion) throw new InvalidDataException("This profile was saved by a newer Shim version. Update Shim before editing it.");
+            if (profile.ConfigVersion == CurrentProfileConfigVersion) return;
+            string backup = CreateConfigBackup(path, profile.ConfigVersion);
+            while (profile.ConfigVersion < CurrentProfileConfigVersion)
+            {
+                switch (profile.ConfigVersion)
+                {
+                    case 0: // Unversioned Shim profiles already match schema 1; preserve every value and stamp the version.
+                        profile.ConfigVersion = 1; break;
+                    default: throw new InvalidDataException("No profile migration is available from config version " + profile.ConfigVersion + ".");
+                }
+            }
+            Write(path, profile);
+        }
+        private static void MigrateOptions(string path, ShimOptions options)
+        {
+            if (options.ConfigVersion > CurrentOptionsConfigVersion) throw new InvalidDataException("These Options were saved by a newer Shim version. Update Shim before editing them.");
+            if (options.ConfigVersion == CurrentOptionsConfigVersion) return;
+            CreateConfigBackup(path, options.ConfigVersion);
+            while (options.ConfigVersion < CurrentOptionsConfigVersion)
+            {
+                switch (options.ConfigVersion)
+                {
+                    case 0: // Unversioned launch Options already match schema 1.
+                        options.ConfigVersion = 1; break;
+                    default: throw new InvalidDataException("No Options migration is available from config version " + options.ConfigVersion + ".");
+                }
+            }
+            Write(path, options);
+        }
+        public static string CreateConfigBackup(string path, int fromVersion)
+        {
+            if (!File.Exists(path)) return null;
+            string folder = Path.Combine(DirectoryPath, "config-backups"); Directory.CreateDirectory(folder);
+            string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff");
+            string target = Path.Combine(folder, Path.GetFileNameWithoutExtension(path) + "-before-v" + fromVersion + "-" + stamp + ".json");
+            File.Copy(path, target, false); return target;
+        }
         public static void SaveStrength(string path, int value, BridgeProfile fallback)
         {
             if (value < 0 || value > 100) throw new ArgumentOutOfRangeException("value");
@@ -144,6 +213,9 @@ namespace RigBridge
         public static T Read<T>(string path) { return new JavaScriptSerializer().Deserialize<T>(File.ReadAllText(path, Encoding.UTF8)); }
         public static void Write(string path, object value)
         {
+            var profile = value as BridgeProfile; if (profile != null && profile.ConfigVersion < CurrentProfileConfigVersion) profile.ConfigVersion = CurrentProfileConfigVersion;
+            var options = value as ShimOptions; if (options != null && options.ConfigVersion < CurrentOptionsConfigVersion) options.ConfigVersion = CurrentOptionsConfigVersion;
+            var appearance = value as UiPreferences; if (appearance != null && appearance.ConfigVersion < CurrentAppearanceConfigVersion) appearance.ConfigVersion = CurrentAppearanceConfigVersion;
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
             byte[] bytes = new UTF8Encoding(false).GetBytes(new JavaScriptSerializer().Serialize(value));
             using (var stream = new FileStream(path + ".tmp", FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))

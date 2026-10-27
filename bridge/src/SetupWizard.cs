@@ -226,7 +226,7 @@ namespace RigBridge
             {
                 if (page == 0)
                 {
-                    draft = resume.Checked && File.Exists(DraftPath) ? Store.Read<BridgeProfile>(DraftPath) : SetupLogic.Clone(original);
+                    draft = resume.Checked && File.Exists(DraftPath) ? Store.LoadProfile(DraftPath, original) : SetupLogic.Clone(original);
                     if (draft == null) draft = SetupLogic.Clone(original);
                     choices = null; roleControlsReady = false;
                 }

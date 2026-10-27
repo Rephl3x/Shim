@@ -38,7 +38,7 @@ namespace RigBridge
         private List<PhysicalDevice> available = new List<PhysicalDevice>();
         private BridgeProfile profile = new BridgeProfile();
         private BridgeRuntime runtime;
-        private bool scanning, closing, learning;
+        private bool scanning, closing, learning, profileConfigBlocked, optionsConfigBlocked;
         private DateTime learnDeadline;
         private string learnKind;
         private int learnIndex;
@@ -81,11 +81,11 @@ namespace RigBridge
             StartPosition = FormStartPosition.CenterScreen; DoubleBuffered = true;
             logPath = Path.Combine(Store.DirectoryPath, "session-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".log");
             if (File.Exists(profilePath))
-                try { profile = Store.Read<BridgeProfile>(profilePath) ?? new BridgeProfile(); }
-                catch (Exception ex) { Log("Could not load the profile: " + ex.Message); }
+                try { profile = Store.LoadProfile(profilePath, new BridgeProfile()); }
+                catch (Exception ex) { profileConfigBlocked = true; Log("Could not load the saved profile; Shim will not overwrite it. " + ex.Message); }
             if (File.Exists(optionsPath))
-                try { options = Store.Read<ShimOptions>(optionsPath) ?? new ShimOptions(); }
-                catch (Exception ex) { Log("Could not load Options: " + ex.Message); }
+                try { options = Store.LoadOptions(optionsPath); }
+                catch (Exception ex) { optionsConfigBlocked = true; Log("Could not load saved Options; Shim will not overwrite them. " + ex.Message); }
             Build();
             enableFfb.Checked = profile.EnableFfb; invert.Checked = profile.InvertFfb;
             virtualId.Value = Math.Max(1, Math.Min(16, profile.VirtualId));
@@ -145,15 +145,15 @@ namespace RigBridge
         {
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 204)); root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            var rail = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18, 30, 18, 20), RowCount = 4, ColumnCount = 1, Tag = "Surface" };
-            rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 382)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
+            var rail = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18, 30, 18, 20), RowCount = 3, ColumnCount = 1, Tag = "Surface" };
+            rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rail.RowStyles.Add(new RowStyle(SizeType.Absolute, 146));
             var brand = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Padding = new Padding(0, 7, 0, 0) };
             var brandImage = Appearance.BrandImage;
             if (brandImage != null) brand.Controls.Add(new PictureBox { Image = brandImage, Size = new Size(82, 82), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Transparent, Margin = new Padding(0, 0, 10, 0) });
             var brandCopy = Stack(); brandCopy.Margin = new Padding(0, 17, 0, 0);
             brandCopy.Controls.Add(new Label { Text = "Shim", Font = new Font("Segoe UI Semibold", 21), AutoSize = true, Tag = "Accent" });
             brandCopy.Controls.Add(new Label { Text = "FORZA BRIDGE", Font = new Font("Segoe UI Semibold", 8), AutoSize = true, Tag = "Muted" }); brand.Controls.Add(brandCopy); rail.Controls.Add(brand, 0, 0);
-            var menu = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var menu = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
             foreach (string name in new[] { "Drive", "Mappings", "Live inputs", "Drivers", "Options", "Updates", "Activity" })
             {
                 string target = name; var button = Button(name); button.AutoSize = false; button.Size = new Size(168, 44); button.TextAlign = ContentAlignment.MiddleLeft; button.Margin = new Padding(0, 0, 0, 8);
@@ -161,8 +161,10 @@ namespace RigBridge
             }
             rail.Controls.Add(menu, 0, 1);
             var railFooter = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var help = Button("Help & reports"); help.AutoSize = false; help.Size = new Size(168, 44); help.TextAlign = ContentAlignment.MiddleLeft; help.Margin = new Padding(0, 0, 0, 8);
+            help.Click += (s, e) => ShowView("Help"); navigation.Add("Help", help); railFooter.Controls.Add(help);
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.7.1"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 3); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.8.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 2); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
@@ -177,7 +179,7 @@ namespace RigBridge
             start.Tag = "Primary"; stop.Tag = "Danger"; start.Text = "Start bridge"; stop.Text = "Stop bridge"; start.MinimumSize = new Size(124, 42); stop.MinimumSize = new Size(124, 42);
             startForza.Tag = "Primary"; startForza.Text = "Start Forza"; startForza.MinimumSize = new Size(124, 42);
             footer.Controls.Add(Flow(startForza, start, stop), 1, 0); content.Controls.Add(footer, 0, 2); root.Controls.Add(content, 1, 0); Controls.Add(root);
-            BuildDrive(); BuildMappings(); BuildDrivers(); BuildOptions(); BuildUpdates();
+            BuildDrive(); BuildMappings(); BuildDrivers(); BuildOptions(); BuildUpdates(); BuildHelp();
             var liveCard = new SurfaceCard { Dock = DockStyle.Fill }; liveCard.Controls.Add(monitor); AddView("Live inputs", liveCard);
             var activityCard = new SurfaceCard { Dock = DockStyle.Fill }; activityCard.Controls.Add(log); AddView("Activity", activityCard);
             status.Text = "Ready. Start the bridge, then launch Forza."; ShowView("Drive");
@@ -191,7 +193,7 @@ namespace RigBridge
             if (!views.ContainsKey(name)) return; currentPage = name;
             foreach (var item in views) item.Value.Visible = item.Key == name;
             views[name].BringToFront(); pageTitle.Text = name == "Drive" ? "Your rig" : name;
-            pageHint.Text = name == "Drive" ? "One virtual wheel. Ready for the next drive." : name == "Mappings" ? "Connect each physical control to your virtual wheel." : name == "Live inputs" ? "Readings from your selected devices." : name == "Drivers" ? "One-time setup and advanced connection settings." : name == "Options" ? "Choose how Shim launches your Forza game." : name == "Updates" ? "Check current versions against published GitHub releases." : name == "Activity" ? "Session events and force feedback diagnostics." : "";
+            pageHint.Text = name == "Drive" ? "One virtual wheel. Ready for the next drive." : name == "Mappings" ? "Connect each physical control to your virtual wheel." : name == "Live inputs" ? "Readings from your selected devices." : name == "Drivers" ? "One-time setup and advanced connection settings." : name == "Options" ? "Choose how Shim launches your Forza game." : name == "Updates" ? "Check current versions against published GitHub releases." : name == "Activity" ? "Session events and force feedback diagnostics." : name == "Help" ? "Things to try when Forza has no force feedback." : "";
             foreach (var item in navigation) item.Value.Tag = item.Key == name ? "Active" : "Nav";
             Appearance.Apply(this);
         }
@@ -294,6 +296,133 @@ namespace RigBridge
             AddUpdateRow(table, "HidHide");
             var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true }; scroll.Controls.Add(table); layout.Controls.Add(scroll, 0, 3);
             card.Controls.Add(layout); AddView("Updates", card);
+        }
+        private void BuildHelp()
+        {
+            var card = new SurfaceCard { Dock = DockStyle.Fill };
+            var checklist = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Tag = "Surface", Padding = new Padding(2, 2, 8, 8) };
+            checklist.Controls.Add(Heading("If Forza has no force feedback"));
+            checklist.Controls.Add(HelpText("Try these checks in order. Steering working with no force usually means the game is not sending FFB to Shim's virtual wheel, or the bridge cannot send it to the physical wheel."));
+            var createReport = Button("Create / submit report"); createReport.Tag = "Primary";
+            createReport.Click += async (s, e) => await CreateSupportReportAsync();
+            createReport.Margin = new Padding(0, 0, 0, 16); checklist.Controls.Add(createReport);
+
+            checklist.Controls.Add(Heading("1. Start the bridge before Forza"));
+            checklist.Controls.Add(HelpText("Close Forza completely. In Shim, start the bridge and wait for Running. Then start Forza, preferably with Start Forza or the Start bridge when I click Start Forza option. Restart the game any time you stop or restart the bridge."));
+
+            checklist.Controls.Add(Heading("2. Check the device Forza is using"));
+            checklist.Controls.Add(HelpText("In Shim's Drivers page, confirm vJoy and HidHide are ready. In Forza, use a custom wheel profile bound to Shim's vJoy virtual wheel. While the bridge is running, HidHide should conceal the physical devices selected in Shim so the virtual wheel is the game-facing controller. Temporarily disconnect or disable other game controllers if they take Device 1."));
+
+            checklist.Controls.Add(Heading("3. Confirm the FFB route and gain"));
+            checklist.Controls.Add(HelpText("On Shim's Drive page, select the MOZA base as the FFB wheel, enable Forward game force feedback, and set Shim strength above 0%. In Forza's wheel settings, make sure force feedback is enabled and its scale is above 0. Check that the base is powered and recognized by its driver software."));
+
+            checklist.Controls.Add(Heading("4. Read Shim's counters"));
+            checklist.Controls.Add(HelpText("FFB packets received staying at 0 means the game has not sent force data to this vJoy session. Recheck the custom wheel profile and device assignment, then restart Forza after the bridge is running."));
+            checklist.Controls.Add(HelpText("Packets increasing but no wheel starts means the game has sent effects, but they have not started. Check the in-game FFB settings and test while driving, not only in menus."));
+            checklist.Controls.Add(HelpText("Wheel starts increasing with no force points to the physical wheel route. Confirm the selected FFB wheel, power, cables and driver status. Open Activity for the exact driver error."));
+
+            checklist.Controls.Add(Heading("5. Check app permissions and competing software"));
+            checklist.Controls.Add(HelpText("Shim normally does not need to run as administrator after setup; Windows will request approval for driver installation and vJoy configuration when needed. Launch Shim and Forza normally. If either is explicitly set to Run this program as an administrator in its Compatibility properties, turn that off for both and retry. Close other bridges, wheel testers or apps that may exclusively own the wheel. If Activity reports DIERR_NOTEXCLUSIVEACQUIRED or access denied, stop those apps before restarting the bridge. 0x800704DF is a different, already-initialized effect error fixed in current Shim builds; update Shim if it appears."));
+
+            checklist.Controls.Add(Heading("6. Share useful details if it still fails"));
+            checklist.Controls.Add(HelpText("Include FH5 or FH6 and whether it is Steam or Xbox app, your wheel model, Shim/vJoy/HidHide versions, the FFB packets and wheel starts counters, and the exact Activity error. Do not post serial numbers or account details."));
+
+            var openDrivers = Button("Open Drivers"); openDrivers.Tag = "Ghost";
+            var openActivity = Button("Open Activity"); openActivity.Tag = "Ghost";
+            var actions = Flow(openDrivers, openActivity);
+            actions.Controls[0].Click += (s, e) => ShowView("Drivers");
+            actions.Controls[1].Click += (s, e) => ShowView("Activity");
+            checklist.Controls.Add(actions);
+            checklist.Controls.Add(Heading("What a report includes"));
+            checklist.Controls.Add(HelpText("Shim collects your Windows and Shim versions, CPU model/core counts, installed memory, graphics adapters and driver versions, racing wheel/controller names and capabilities, relevant wheel/controller driver details, limited Shim settings (FFB enabled/strength, selected wheel name and device count), bridge state and recent FFB counters, and up to three recent Activity logs plus startup/watchdog diagnostics. Controller names and log messages can identify your equipment and may contain troubleshooting details."));
+            checklist.Controls.Add(HelpText("Shim does not collect your Forza account data, button mappings, calibration, or unrelated files. It does not intentionally collect your Windows account name or hardware serial numbers; diagnostic logs may contain details from driver errors, so inspect the ZIP before sharing. Reports are created on your PC first."));
+            checklist.Controls.Add(HelpText("If you submit a report, it is sent over HTTPS to Shim support and visible only to the Shim maintainer for troubleshooting. It is not sold, published, or shared with other people. Cloudflare provides the private network and storage service and may process normal request metadata. Reports expire at 30 days; daily cleanup removes expired reports within 24 hours. Uploading is optional."));
+            checklist.Controls.Add(HelpText("Email me a copy creates a draft in your email app with the ZIP attached and addressed to you. Shim does not send that email; review it and press Send yourself. Your email app/provider will handle it if you choose to send."));
+            card.Controls.Add(checklist); AddView("Help", card);
+        }
+        private async Task CreateSupportReportAsync()
+        {
+            string reportPath = null;
+            try
+            {
+                string generatedPath = SupportReports.CreateBundle(profile, runtime, lastPackets, lastStarts);
+                using (var dialog = new SaveFileDialog {
+                    Title = "Save Shim support report",
+                    Filter = "Shim support report (*.zip)|*.zip",
+                    FileName = Path.GetFileName(generatedPath),
+                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    OverwritePrompt = true
+                })
+                {
+                    if (dialog.ShowDialog(this) != DialogResult.OK)
+                    {
+                        Log("Support report saved locally: " + generatedPath);
+                        return;
+                    }
+                    reportPath = dialog.FileName;
+                    if (!String.Equals(Path.GetFullPath(generatedPath), Path.GetFullPath(reportPath), StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Copy(generatedPath, reportPath, true);
+                        File.Delete(generatedPath);
+                    }
+                }
+                var answer = ChooseSupportReportAction(reportPath);
+                if (answer == "Email")
+                {
+                    string address = PromptForReportEmail();
+                    if (address == null) return;
+                    string draft = SupportReports.CreateEmailDraft(reportPath, address);
+                    Log("Support report email draft created locally: " + draft);
+                    MessageBox.Show(this, "Your email app opened a draft with the report attached. Shim has not sent it. Check the recipient and attachment, then press Send if you want to email it.", "Email draft ready", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                if (answer != "Upload") { Log("Support report kept locally: " + reportPath); return; }
+                status.Text = "Uploading support report...";
+                string reportId = await SupportReports.UploadAsync(reportPath);
+                Log("Support report uploaded. Reference: " + reportId);
+                MessageBox.Show(this, "Report uploaded over HTTPS to private Shim support storage. It is used for troubleshooting and expires at 30 days; daily cleanup removes expired reports within 24 hours. Reference: " + reportId + "\r\n\r\nYour local copy remains at:\r\n" + reportPath, "Support report submitted", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                Log("Support report: " + ex.Message);
+                MessageBox.Show(this, "The report could not be uploaded. The local copy was kept if it was created.\r\n\r\n" + ex.Message + (reportPath == null ? "" : "\r\n\r\n" + reportPath), "Support report", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+        private string ChooseSupportReportAction(string path)
+        {
+            using (var dialog = new Form { Text = "Review your support report", StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false, ClientSize = new Size(640, 380), AutoScaleMode = AutoScaleMode.Dpi, BackColor = Appearance.Colors.Surface, ForeColor = Appearance.Colors.Text })
+            {
+                var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(18) };
+                layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+                var textArea = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+                var text = new Label { AutoSize = true, MaximumSize = new Size(570, 0), ForeColor = Appearance.Colors.Text, Text = "Your report is saved locally and ready to inspect:\r\n" + path + "\r\n\r\nSubmitting sends it over HTTPS to private Shim support storage, visible only to the Shim maintainer for troubleshooting. It is not published or shared with other people. Cloudflare provides the network and storage service. It expires at 30 days and daily cleanup removes expired reports within 24 hours. Upload is optional." };
+                textArea.Controls.Add(text); layout.Controls.Add(textArea, 0, 0);
+                var local = Button("Keep local"); local.DialogResult = DialogResult.No;
+                var email = Button("Email me a copy"); email.DialogResult = DialogResult.Retry;
+                var upload = Button("Submit to support"); upload.Tag = "Primary"; upload.DialogResult = DialogResult.Yes;
+                var choices = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
+                choices.Controls.AddRange(new Control[] { upload, email, local }); layout.Controls.Add(choices, 0, 1);
+                dialog.Controls.Add(layout); dialog.CancelButton = local; Appearance.Apply(dialog);
+                DialogResult result = dialog.ShowDialog(this);
+                return result == DialogResult.Retry ? "Email" : result == DialogResult.Yes ? "Upload" : "Local";
+            }
+        }
+        private string PromptForReportEmail()
+        {
+            using (var dialog = new Form { Text = "Email yourself a report copy", StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false, ClientSize = new Size(460, 150), BackColor = Color.FromArgb(25, 28, 32), ForeColor = Color.White })
+            {
+                var label = new Label { Left = 16, Top = 15, Width = 426, Height = 38, Text = "Enter your address. Shim will open a draft; it will not send it." };
+                var address = new TextBox { Left = 16, Top = 57, Width = 426 };
+                var ok = new Button { Text = "Open email draft", Left = 281, Top = 98, Width = 160, Height = 36, DialogResult = DialogResult.OK };
+                var cancel = new Button { Text = "Cancel", Left = 190, Top = 98, Width = 80, Height = 36, DialogResult = DialogResult.Cancel };
+                dialog.Controls.AddRange(new Control[] { label, address, ok, cancel }); dialog.AcceptButton = ok; dialog.CancelButton = cancel;
+                if (dialog.ShowDialog(this) != DialogResult.OK) return null;
+                return address.Text.Trim();
+            }
+        }
+        private static Label HelpText(string text)
+        {
+            var label = Label(text); label.MaximumSize = new Size(780, 0); label.Margin = new Padding(0, 0, 12, 12); return label;
         }
         private void AddUpdateRow(TableLayoutPanel table, string name)
         {
@@ -428,6 +557,7 @@ namespace RigBridge
         private void SaveOptions()
         {
             if (previewPath != null || scanningForza) return;
+            if (optionsConfigBlocked) { Log("Options are read-only because this Shim version could not safely load their saved format. Update Shim or choose fresh settings in its installer."); return; }
             options.StartBridgeWithForza = startBridgeWithForza.Checked;
             var target = forzaTarget.SelectedItem as ForzaGameTarget;
             options.ForzaTargetId = target == null ? null : target.Id;
@@ -553,6 +683,7 @@ namespace RigBridge
         private async Task RunSetup()
         {
             if (runtime != null || scanning || previewPath != null) return;
+            if (profileConfigBlocked) { MessageBox.Show(this, "Shim could not safely read the saved rig profile, so setup is disabled to protect it. Update Shim or select fresh settings in the installer. The original file has not been changed.", "Profile kept safe", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             CaptureSelections();
             using (var wizard = new SetupWizard(profile, available, null, 0))
             {
@@ -572,7 +703,7 @@ namespace RigBridge
             RenderRig();
         }
         private bool SaveProfile()
-        { try { CaptureSelections(); Store.Write(profilePath, profile); Log("Saved profile."); return true; } catch (Exception ex) { Log(ex.Message); return false; } }
+        { if (profileConfigBlocked) { Log("Profile is read-only because this Shim version could not safely load its saved format."); return false; } try { CaptureSelections(); Store.Write(profilePath, profile); Log("Saved profile."); return true; } catch (Exception ex) { Log(ex.Message); return false; } }
         private void Start(bool monitorOnly)
         {
             try
@@ -668,10 +799,11 @@ namespace RigBridge
         private void UpdateButtons()
         {
             bool idle = runtime == null && !scanning;
-            devices.Enabled = wheel.Enabled = enableFfb.Enabled = invert.Enabled = virtualId.Enabled = dll.Enabled = refresh.Enabled = save.Enabled = autoButtons.Enabled = remove.Enabled = idle;
+            devices.Enabled = wheel.Enabled = enableFfb.Enabled = invert.Enabled = virtualId.Enabled = dll.Enabled = refresh.Enabled = autoButtons.Enabled = remove.Enabled = idle && !profileConfigBlocked;
+            save.Enabled = idle && !profileConfigBlocked;
             strength.Enabled = !scanning && (runtime == null || runtime.CanChangeGain);
-            start.Enabled = idle && previewPath == null && profile.Devices.Count > 0 && profile.Bindings.Count > 0 && !File.Exists(Store.RecoveryPath);
-            bool canAutoStartBridge = runtime != null ? !runtime.IsMonitorOnly && !runtime.Stopping : idle && profile.Devices.Count > 0 && profile.Bindings.Count > 0 && !File.Exists(Store.RecoveryPath);
+            start.Enabled = idle && !profileConfigBlocked && previewPath == null && profile.Devices.Count > 0 && profile.Bindings.Count > 0 && !File.Exists(Store.RecoveryPath);
+            bool canAutoStartBridge = runtime != null ? !runtime.IsMonitorOnly && !runtime.Stopping : idle && !profileConfigBlocked && profile.Devices.Count > 0 && profile.Bindings.Count > 0 && !File.Exists(Store.RecoveryPath);
             startForza.Enabled = previewPath == null && !launchingForza && !scanningForza && forzaTarget.SelectedItem != null && (!options.StartBridgeWithForza || canAutoStartBridge);
             startBridgeWithForza.Enabled = idle && !launchingForza && previewPath == null;
             forzaTarget.Enabled = !launchingForza && !scanningForza && previewPath == null;
@@ -684,8 +816,8 @@ namespace RigBridge
                 row.Action.Enabled = !checkingUpdates && !updatingComponent && runtime == null && row.Info != null &&
                     row.CanUpdate;
             learn.Enabled = runtime != null && runtime.IsMonitorOnly && runtime.Started;
-            foreach (var action in setupActions) action.Enabled = idle && previewPath == null;
-            setupWizard.Enabled = idle && previewPath == null;
+            foreach (var action in setupActions) action.Enabled = idle && !profileConfigBlocked && previewPath == null;
+            setupWizard.Enabled = idle && !profileConfigBlocked && previewPath == null;
             UpdateOverview();
         }
         private void InstallDriver(bool vjoy)
@@ -700,9 +832,15 @@ namespace RigBridge
         }
         private void Log(string message)
         {
+            string level = message.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0 || message.IndexOf("failed", StringComparison.OrdinalIgnoreCase) >= 0 || message.IndexOf("exception", StringComparison.OrdinalIgnoreCase) >= 0 ? "ERROR" : "INFO";
             string line = DateTime.Now.ToString("HH:mm:ss") + "  " + message;
             log.AppendText(line + Environment.NewLine); status.Text = message;
-            try { File.AppendAllText(logPath, line + Environment.NewLine); }
+            try
+            {
+                File.AppendAllText(logPath, line + Environment.NewLine);
+                var entry = new { TimestampUtc = DateTime.UtcNow.ToString("o"), Level = level, Message = message };
+                File.AppendAllText(logPath + ".jsonl", new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(entry) + Environment.NewLine);
+            }
             catch (IOException ex) { log.AppendText("Log file error: " + ex.Message + Environment.NewLine); }
             catch (UnauthorizedAccessException ex) { log.AppendText("Log file error: " + ex.Message + Environment.NewLine); }
         }

@@ -22,20 +22,37 @@ jobs:
 
       - name: Compile Shim and run hardware-free tests
         shell: pwsh
-        run: .\BuildBridge.ps1 -Test -OutputDirectory .\artifacts\build
+        run: .\BuildBridge.ps1 -Test -OutputDirectory .\build\test
 
       - name: Verify and assemble the distributable package
         shell: pwsh
-        run: .\PackageBridge.ps1 -SkipTests -OutputDirectory .\artifacts\package
+        run: .\PackageBridge.ps1 -SkipTests -OutputDirectory .\build\payload
+
+      - name: Install pinned Inno Setup compiler
+        shell: pwsh
+        run: |
+          $installerPath = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $installerPath
+          $expectedHash = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+          $actualHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) { throw 'Inno Setup installer SHA-256 validation failed.' }
+          $install = Start-Process -FilePath $installerPath -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Inno Setup install failed with exit code $($install.ExitCode)." }
+
+      - name: Build the Windows setup executable
+        shell: pwsh
+        run: .\BuildInstaller.ps1 -PayloadDirectory .\build\payload -SkipTests
 
       - name: Upload Shim build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Shim-${{ github.sha }}
           path: |
-            artifacts/build/Shim.exe
-            artifacts/build/Shim.Tests.exe
-            dist/Shim-0.7.1.zip
-            dist/Shim-0.7.1.zip.sha256
+            build/test/Shim.exe
+            build/test/Shim.Tests.exe
+            dist/latest/Shim-0.8.0.zip
+            dist/latest/Shim-0.8.0.zip.sha256
+            dist/latest/Shim-Setup-0.8.0.exe
+            dist/latest/Shim-Setup-0.8.0.exe.sha256
           if-no-files-found: error
           retention-days: 14

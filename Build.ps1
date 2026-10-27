@@ -6,7 +6,7 @@ $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) {
     throw 'The built-in .NET Framework C# compiler was not found. Build on Windows 10/11 x64 with .NET Framework 4.8.'
 }
-$outputDirectory = Join-Path $PSScriptRoot 'dist'
+$outputDirectory = Join-Path $PSScriptRoot 'build\legacy'
 [void](New-Item -ItemType Directory -Path $outputDirectory -Force)
 $sourceFiles = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' | ForEach-Object FullName)
 $references = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll', '/r:System.Web.Extensions.dll')

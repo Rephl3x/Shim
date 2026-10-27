@@ -2,11 +2,11 @@
 param([switch]$Test, [string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $PSScriptRoot 'dist\bridge' }
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $PSScriptRoot 'build\bridge' }
 $outputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 [void](New-Item -ItemType Directory -Path $outputDirectory -Force)
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'bridge\src') -Filter '*.cs' | ForEach-Object FullName)
-$references = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll', '/r:System.Web.Extensions.dll', '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll')
+$references = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll', '/r:System.Web.Extensions.dll', '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll', '/r:System.Management.dll')
 $brandGraphic = Join-Path $PSScriptRoot 'assets\shim-app-mark-transparent.png'
 $appIcon = Join-Path $PSScriptRoot 'assets\shim-app-icon.ico'
 if (-not (Test-Path -LiteralPath $brandGraphic -PathType Leaf)) { throw "Shim brand graphic not found: $brandGraphic" }

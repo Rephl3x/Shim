@@ -12,6 +12,7 @@ namespace RigBridge
 {
     public sealed class ShimOptions
     {
+        public int ConfigVersion { get; set; }
         public bool StartBridgeWithForza { get; set; }
         public string ForzaTargetId { get; set; }
     }

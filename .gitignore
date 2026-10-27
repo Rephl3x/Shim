@@ -1,6 +1,13 @@
 /dist/
 /artifacts/
+/build/
+/archive/
 /reference/
 /third-party/
 *.local.json
 *.local.png
+node_modules/
+.cloudflare/
+.wrangler/
+__pycache__/
+*.pyc
