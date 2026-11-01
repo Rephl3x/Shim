@@ -85,6 +85,16 @@ namespace RigBridge
                         if (!File.Exists(ready)) throw new InvalidOperationException("The recovery watchdog could not start. No devices have been hidden.");
                         File.Delete(ready);
                         HideSession.Apply(hiding, recovery);
+                        var otherControllers = all.Where(d => !d.Virtual && !profile.Devices.Contains(d.Id))
+                            .Select(d => d.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                        var virtualControllers = all.Where(d => d.Virtual).Select(d => d.Name).ToList();
+                        messages.Enqueue("Device visibility: hiding " + profile.Devices.Count + " selected physical controller(s); " +
+                            virtualControllers.Count + " vJoy controller(s) and " + otherControllers.Count + " other physical controller(s) were detected.");
+                        if (otherControllers.Count > 0)
+                            messages.Enqueue("Other physical controllers may still appear in Forza: " + String.Join(", ", otherControllers) +
+                                ". Check joy.cpl while the bridge runs. Hide or disconnect any controller taking the virtual wheel's game slot.");
+                        if (virtualControllers.Count > 1)
+                            messages.Enqueue("More than one vJoy controller is enabled. Forza may bind to the wrong one; disable unused vJoy slots in Configure vJoy.");
                     }
                     foreach (var info in all.Where(d => !d.Virtual && profile.Devices.Contains(d.Id)))
                         readers.Add(direct.Open(info, window, !monitorOnly && profile.EnableFfb && info.Id == profile.FfbDevice));

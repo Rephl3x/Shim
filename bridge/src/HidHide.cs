@@ -147,6 +147,10 @@ namespace RigBridge
             driver.SetList(2049, driver.GetList(2048).Concat(recovery.AddedApplications));
             driver.SetList(2051, driver.GetList(2050).Concat(recovery.AddedDevices));
             driver.SetFlag(2053, true);
+            if (!driver.GetFlag(2052) ||
+                recovery.AddedDevices.Except(driver.GetList(2050), StringComparer.OrdinalIgnoreCase).Any() ||
+                recovery.AddedApplications.Except(driver.GetList(2048), StringComparer.OrdinalIgnoreCase).Any())
+                throw new IOException("HidHide did not confirm the new hiding rules. The bridge stopped before Forza could see duplicate controllers.");
         }
         public static void Restore(IHideDriver driver, HideRecovery recovery)
         {

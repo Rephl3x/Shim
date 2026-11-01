@@ -294,6 +294,15 @@ namespace RigBridge.Tests
                 using (var driver = new HideDriver((function, input, output) => { throw new Win32Exception(5, "Denied"); }))
                 { Throws(() => driver.SetList(2049, new[] { "OUR_APP" })); Throws(() => driver.SetFlag(2053, true)); }
             });
+            Test("HidHide refuses to start when hiding writes were acknowledged but ignored", () => {
+                var io = new FakeHideControl { IgnoreWrites = true };
+                using (var driver = new HideDriver(io.Send))
+                {
+                    var recovery = HideSession.Prepare(driver, new[] { "HID\\WHEEL" }, "OUR_APP", null);
+                    Throws(() => HideSession.Apply(driver, recovery));
+                    Assert(!io.Active && io.Black.Count == 0, "Ignored writes unexpectedly hid a controller");
+                }
+            });
             Test("HidHide refuses to report recovery success if acknowledged writes were ignored", () => {
                 var io = new FakeHideControl();
                 using (var driver = new HideDriver(io.Send))

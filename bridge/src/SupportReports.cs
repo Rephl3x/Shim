@@ -88,9 +88,11 @@ namespace RigBridge
             {
                 using (var direct = new DirectInput())
                 {
-                    var devices = direct.Enumerate().Where(d => !d.Virtual).ToList();
+                    var devices = direct.Enumerate();
                     data["controllers"] = devices.Select(d => new {
-                        name = d.Name, forceFeedback = d.ForceFeedback,
+                        name = d.Name, virtualController = d.Virtual,
+                        selectedForBridge = profile != null && !d.Virtual && profile.Devices.Contains(d.Id),
+                        forceFeedback = d.ForceFeedback,
                         axisCount = d.Controls.Count(c => c.Kind == "Axis"),
                         buttonCount = d.Controls.Count(c => c.Kind == "Button"),
                         hatCount = d.Controls.Count(c => c.Kind == "POV")
@@ -100,6 +102,7 @@ namespace RigBridge
                         forceFeedbackForwarding = profile != null && profile.EnableFfb,
                         forceFeedbackStrengthPercent = profile == null ? 0 : profile.FfbGain,
                         invertSteeringForces = profile != null && profile.InvertFfb,
+                        virtualDeviceSlot = profile == null ? 0 : profile.VirtualId,
                         configuredPhysicalDeviceCount = profile == null ? 0 : profile.Devices.Count,
                         selectedForceFeedbackWheel = wheel == null ? null : wheel.Name,
                         bridgeRunning = runtime != null && runtime.Started && !runtime.Stopping,
@@ -107,6 +110,20 @@ namespace RigBridge
                         recentFfbPackets = runtime != null ? runtime.FfbPackets : lastPackets,
                         recentWheelStarts = runtime != null ? runtime.WheelStarts : lastStarts
                     };
+                    try
+                    {
+                        using (var hide = new HideDriver())
+                        {
+                            var blocked = hide.GetList(2050);
+                            data["deviceHiding"] = new {
+                                active = hide.GetFlag(2052), inverseMode = hide.GetFlag(2054),
+                                selectedControllersBlocked = devices.Count(d => !d.Virtual && profile != null &&
+                                    profile.Devices.Contains(d.Id) && blocked.Contains(d.HidId, StringComparer.OrdinalIgnoreCase)),
+                                selectedControllerCount = devices.Count(d => !d.Virtual && profile != null && profile.Devices.Contains(d.Id))
+                            };
+                        }
+                    }
+                    catch (Exception ex) { data["deviceHidingError"] = ex.GetType().Name; }
                 }
             }
             catch (Exception ex) { data["controllerInventoryError"] = ex.GetType().Name; }
