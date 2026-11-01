@@ -164,7 +164,7 @@ namespace RigBridge
             var help = Button("Help & reports"); help.AutoSize = false; help.Size = new Size(168, 44); help.TextAlign = ContentAlignment.MiddleLeft; help.Margin = new Padding(0, 0, 0, 8);
             help.Click += (s, e) => ShowView("Help"); navigation.Add("Help", help); railFooter.Controls.Add(help);
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.8.0"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 2); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.8.1"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 2); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };

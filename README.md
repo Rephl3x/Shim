@@ -11,12 +11,14 @@
 
 This addresses rigs where steering works but force feedback goes missing because Forza binds a different device. Shim uses HidHide while the bridge runs so the selected physical controllers do not compete with the virtual wheel. You still create and bind a custom wheel profile in Forza. Shim does not change USB device order, patch the game, or inject into it.
 
-## Download Shim 0.8.0
+## Download Shim 0.8.1
 
 | Download | Use it for |
 | --- | --- |
-| [Windows installer](https://github.com/Rephl3x/Shim/releases/download/v0.8.0/Shim-Setup-0.8.0.exe) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.0/Shim-Setup-0.8.0.exe.sha256)) | Installing or upgrading Shim. It includes the vJoy and HidHide installers and can back up existing settings. |
-| [Portable ZIP](https://github.com/Rephl3x/Shim/releases/download/v0.8.0/Shim-0.8.0.zip) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.0/Shim-0.8.0.zip.sha256)) | Running from an extracted folder. Keep `Shim.exe` beside its `drivers` and `runtime` folders. |
+| [Windows installer](https://github.com/Rephl3x/Shim/releases/download/v0.8.1/Shim-Setup-0.8.1.exe) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.1/Shim-Setup-0.8.1.exe.sha256)) | Installing or upgrading Shim. It includes the vJoy and HidHide installers and can back up existing settings. |
+| [Portable ZIP](https://github.com/Rephl3x/Shim/releases/download/v0.8.1/Shim-0.8.1.zip) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.1/Shim-0.8.1.zip.sha256)) | Running from an extracted folder. Keep `Shim.exe` beside its `drivers` and `runtime` folders. |
+
+Version 0.8.1 adds controller-visibility and XInput-slot diagnostics to help trace cases where Forza assigns vJoy to Device 2 and sends no FFB packets. Support reports now identify the selected physical controllers, virtual controllers, configured vJoy slot, and HidHide rule status. Shim also verifies that HidHide accepted its hiding rules before the bridge runs. This update helps identify the cause; it does not change how Forza numbers devices.
 
 **Requirements:** Windows 10/11 x64 and .NET Framework 4.8 or later. Driver installation and vJoy configuration need Windows administrator approval; restart if a driver installer asks. The vJoy and HidHide vendor installers are checked for signatures and hashes before packaging. Shim's own app and setup executables are currently unsigned.
 
@@ -47,13 +49,13 @@ Open **Help & reports** at the bottom of Shim's sidebar for the full checklist. 
 1. Close Forza, start the bridge, wait for **Running**, and launch the game again.
 2. Confirm vJoy and HidHide are ready on **Drivers**, and that Forza's custom wheel profile uses Shim's virtual wheel.
 3. Select the physical wheel as the FFB destination. Turn on forwarding and set both Shim and in-game force strength above zero.
-4. Check the **FFB packets** and **Wheel starts** counters on Drive. Zero packets points to the game-to-vJoy route; packets without force point to effect playback or the physical-wheel route. **Activity** records driver errors.
+4. Check the **FFB packets** and **Wheel starts** counters on Drive. Zero packets points to the game-to-vJoy route; packets without force point to effect playback or the physical-wheel route. If `joy.cpl` shows only vJoy but Forza still labels steering as Device 2, create a fresh custom wheel profile and rebind steering before testing again. **Activity** records device-visibility checks and driver errors.
 
 Shim normally runs without administrator rights after setup. If Shim or Forza has **Run this program as an administrator** enabled in Compatibility settings, turn that off for both while troubleshooting. Close other FFB tools that may hold the wheel exclusively. See the [detailed no-FFB checklist](bridge/README.md#no-force-feedback-checklist).
 
 ## Support reports and privacy
 
-Open **Help & reports**, then click **Create / submit report** to create a ZIP on your PC. It contains Windows and Shim versions, CPU and memory details, GPU and relevant controller-driver versions, controller names and capabilities, limited FFB settings and counters, and recent Shim logs. It does not include button mappings, calibration, Forza account data, or unrelated files. Device names and diagnostic logs can still contain identifying details, so inspect the ZIP before sharing.
+Open **Help & reports**, then click **Create / submit report** to create a ZIP on your PC. It contains Windows and Shim versions, CPU and memory details, GPU and relevant controller-driver versions, controller names and capabilities, selected/virtual controller flags, the vJoy slot, HidHide rule counts, XInput slot numbers visible to Shim, limited FFB settings and counters, and recent Shim logs. It does not include button mappings, calibration, Forza account data, or unrelated files. Device names and diagnostic logs can still contain identifying details, so inspect the ZIP before sharing.
 
 You can keep the report locally, open an email draft addressed to yourself, or explicitly upload it to Shim support. Shim never sends the email draft for you. Uploads use HTTPS, are visible only to the Shim maintainer through a private portal that displays each report file on one page, and expire after 30 days. Cloudflare provides the network and private storage service. No report is uploaded unless you choose **Submit to support**.
 
