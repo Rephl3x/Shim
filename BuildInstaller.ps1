@@ -44,7 +44,7 @@ try {
     $env:SHIM_SETUP_OUTPUT = $previousOutput
 }
 
-$setupPath = Join-Path $OutputDirectory 'Shim-Setup-0.8.1.exe'
+$setupPath = Join-Path $OutputDirectory 'Shim-Setup-0.8.2.exe'
 $hash = Get-FileHash -LiteralPath $setupPath -Algorithm SHA256
 ('{0} *{1}' -f $hash.Hash.ToLowerInvariant(), [IO.Path]::GetFileName($setupPath)) | Set-Content -LiteralPath ($setupPath + '.sha256') -Encoding ASCII
 Write-Output "Built $setupPath"

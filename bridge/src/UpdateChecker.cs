@@ -45,7 +45,7 @@ namespace RigBridge
             public Asset Primary, Companion;
         }
 
-        private sealed class Asset
+        internal sealed class Asset
         {
             public string Name, Url, Digest;
             public long Size;
@@ -143,32 +143,144 @@ namespace RigBridge
                     var json = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(reader.ReadToEnd());
                     string tag = Value(json, "tag_name");
                     if (String.IsNullOrWhiteSpace(tag)) return new Release { Error = "GitHub returned a release without a version tag." };
-                    var assets = ReadAssets(json);
-                    Asset primary = null, companion = null;
-                    if (source.Name == "Shim")
-                    {
-                        string version = tag.TrimStart('v', 'V');
-                        primary = assets.FirstOrDefault(a => String.Equals(a.Name, "Shim-" + version + ".zip", StringComparison.OrdinalIgnoreCase));
-                    }
-                    else if (source.Name == "vJoy")
-                    {
-                        primary = assets.FirstOrDefault(a => a.Name.StartsWith("vJoySetup_", StringComparison.OrdinalIgnoreCase) && a.Name.EndsWith("_Win10_Win11.exe", StringComparison.OrdinalIgnoreCase));
-                        companion = assets.FirstOrDefault(a => String.Equals(a.Name, "SDK.zip", StringComparison.OrdinalIgnoreCase));
-                    }
-                    else if (source.Name == "HidHide")
-                        primary = assets.FirstOrDefault(a => a.Name.StartsWith("HidHide_", StringComparison.OrdinalIgnoreCase) && a.Name.EndsWith("_x64.exe", StringComparison.OrdinalIgnoreCase));
-                    return new Release { Tag = tag, Primary = primary, Companion = companion };
+                    return SelectRelease(source, tag, ReadAssets(json));
                 }
             }
             catch (WebException ex)
             {
                 var response = ex.Response as HttpWebResponse;
+                bool limited = response != null && (response.StatusCode == HttpStatusCode.Forbidden || (int)response.StatusCode == 429);
                 string reason = response == null ? ex.Status.ToString() : ((int)response.StatusCode) + " " + response.StatusDescription;
                 if (response != null) response.Dispose();
+                if (limited)
+                {
+                    try { return FetchPublicRelease(source); }
+                    catch (Exception fallback) { return new Release { Error = "GitHub API was limited (" + reason + "); the public release check also failed: " + fallback.Message }; }
+                }
                 return new Release { Error = "GitHub request failed (" + reason + "). Check your internet connection and try again." };
             }
             catch (Exception ex)
             { return new Release { Error = "Could not read the GitHub release: " + ex.Message }; }
+        }
+
+        private static Release SelectRelease(Source source, string tag, IList<Asset> assets)
+        {
+            Asset primary = null, companion = null;
+            if (source.Name == "Shim")
+            {
+                string version = tag.TrimStart('v', 'V');
+                primary = assets.FirstOrDefault(a => String.Equals(a.Name, "Shim-" + version + ".zip", StringComparison.OrdinalIgnoreCase));
+            }
+            else if (source.Name == "vJoy")
+            {
+                primary = assets.FirstOrDefault(a => a.Name.StartsWith("vJoySetup_", StringComparison.OrdinalIgnoreCase) && a.Name.EndsWith("_Win10_Win11.exe", StringComparison.OrdinalIgnoreCase));
+                companion = assets.FirstOrDefault(a => String.Equals(a.Name, "SDK.zip", StringComparison.OrdinalIgnoreCase));
+            }
+            else if (source.Name == "HidHide")
+                primary = assets.FirstOrDefault(a => a.Name.StartsWith("HidHide_", StringComparison.OrdinalIgnoreCase) && a.Name.EndsWith("_x64.exe", StringComparison.OrdinalIgnoreCase));
+            return new Release { Tag = tag, Primary = primary, Companion = companion };
+        }
+
+        private static Release FetchPublicRelease(Source source)
+        {
+            string origin = "https://github.com/" + source.Repository;
+            Uri latestUri;
+            ReadPublicPage(origin + "/releases/latest", 1024 * 1024, out latestUri);
+            string tag = PublicReleaseTag(latestUri, source.Repository);
+            Uri assetsUri;
+            string html = ReadPublicPage(origin + "/releases/expanded_assets/" + Uri.EscapeDataString(tag), 1024 * 1024, out assetsUri);
+            if (!String.Equals(assetsUri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("GitHub's asset list redirected outside GitHub.");
+            var assets = ParsePublicAssets(html, source.Repository, tag);
+            var release = SelectRelease(source, tag, assets);
+            foreach (var asset in new[] { release.Primary, release.Companion }.Where(a => a != null)) asset.Size = PublicAssetSize(asset.Url);
+            if (source.Name == "Shim" && release.Primary != null)
+            {
+                var sidecar = assets.FirstOrDefault(a => String.Equals(a.Name, release.Primary.Name + ".sha256", StringComparison.OrdinalIgnoreCase));
+                if (sidecar != null)
+                {
+                    Uri checksumUri;
+                    string checksum = ReadPublicPage(sidecar.Url, 512, out checksumUri);
+                    if (!AllowedAssetHost(checksumUri)) throw new InvalidDataException("GitHub's checksum redirected to an unexpected host.");
+                    release.Primary.Digest = ParseSidecarSha256(checksum, release.Primary.Name);
+                }
+            }
+            return release;
+        }
+
+        private static string ReadPublicPage(string url, int maxChars, out Uri finalUri)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "GET"; request.UserAgent = "Shim-Update-Checker";
+            request.Timeout = 12000; request.ReadWriteTimeout = 12000;
+            using (var response = (HttpWebResponse)request.GetResponse())
+            using (var stream = response.GetResponseStream())
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
+            {
+                finalUri = response.ResponseUri;
+                if (finalUri.Scheme != Uri.UriSchemeHttps || !AllowedAssetHost(finalUri))
+                    throw new InvalidDataException("GitHub redirected the release check to an unexpected host.");
+                var buffer = new char[4096]; var text = new StringBuilder(); int count;
+                while ((count = reader.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    text.Append(buffer, 0, count);
+                    if (text.Length > maxChars) throw new InvalidDataException("GitHub's release response is unexpectedly large.");
+                }
+                return text.ToString();
+            }
+        }
+
+        private static bool AllowedAssetHost(Uri uri)
+        { return String.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase); }
+
+        internal static string PublicReleaseTag(Uri uri, string repository)
+        {
+            string prefix = "/" + repository + "/releases/tag/";
+            if (uri == null || uri.Scheme != Uri.UriSchemeHttps || !String.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) ||
+                !uri.AbsolutePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("GitHub did not redirect to a release tag.");
+            string tag = Uri.UnescapeDataString(uri.AbsolutePath.Substring(prefix.Length));
+            if (!Regex.IsMatch(tag, @"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")) throw new InvalidDataException("GitHub returned an invalid release tag.");
+            return tag;
+        }
+
+        internal static List<Asset> ParsePublicAssets(string html, string repository, string tag)
+        {
+            var result = new List<Asset>();
+            string prefix = "/" + repository + "/releases/download/" + tag + "/";
+            foreach (Match match in Regex.Matches(html ?? "", "href=\"([^\"]+)\"", RegexOptions.IgnoreCase))
+            {
+                string link = WebUtility.HtmlDecode(match.Groups[1].Value);
+                Uri uri;
+                if (!Uri.TryCreate(new Uri("https://github.com"), link, out uri) || uri.Scheme != Uri.UriSchemeHttps ||
+                    !String.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) ||
+                    !uri.AbsolutePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || !String.IsNullOrEmpty(uri.Query)) continue;
+                string name = Uri.UnescapeDataString(uri.AbsolutePath.Substring(prefix.Length));
+                if (String.IsNullOrEmpty(name) || name.IndexOf('/') >= 0 || name.IndexOf('\\') >= 0 ||
+                    result.Any(a => String.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))) continue;
+                result.Add(new Asset { Name = name, Url = uri.AbsoluteUri });
+            }
+            return result;
+        }
+
+        private static long PublicAssetSize(string url)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "HEAD"; request.UserAgent = "Shim-Update-Checker";
+            request.Timeout = 12000; request.ReadWriteTimeout = 12000;
+            using (var response = (HttpWebResponse)request.GetResponse())
+            {
+                if (response.ResponseUri.Scheme != Uri.UriSchemeHttps || !AllowedAssetHost(response.ResponseUri) || response.ContentLength < 1)
+                    throw new InvalidDataException("GitHub did not provide a valid asset size.");
+                return response.ContentLength;
+            }
+        }
+
+        internal static string ParseSidecarSha256(string content, string assetName)
+        {
+            Match match = Regex.Match((content ?? "").Trim(), @"^([a-fA-F0-9]{64}) \*" + Regex.Escape(assetName) + "$", RegexOptions.CultureInvariant);
+            if (!match.Success) throw new InvalidDataException("The published checksum did not match the Shim package name.");
+            return "sha256:" + match.Groups[1].Value.ToLowerInvariant();
         }
 
         private static string Value(IDictionary<string, object> json, string key)

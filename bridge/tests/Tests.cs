@@ -22,6 +22,20 @@ namespace RigBridge.Tests
         private static void Run()
         {
             PhysicalForceTests.Run(Test);
+            Test("Public GitHub release fallback accepts only matching release assets", () => {
+                string html = "<a href=\"/Rephl3x/Shim/releases/download/v0.8.2/Shim-0.8.2.zip\"></a>" +
+                    "<a href=\"/Rephl3x/Shim/releases/download/v0.8.2/Shim-0.8.2.zip.sha256\"></a>" +
+                    "<a href=\"/Rephl3x/Shim/releases/download/v0.8.1/old.zip\"></a>" +
+                    "<a href=\"https://github.com.evil.example/Rephl3x/Shim/releases/download/v0.8.2/evil.zip\"></a>";
+                var assets = UpdateChecker.ParsePublicAssets(html, "Rephl3x/Shim", "v0.8.2");
+                Assert(assets.Count == 2 && assets.Any(a => a.Name == "Shim-0.8.2.zip") &&
+                    assets.Any(a => a.Name == "Shim-0.8.2.zip.sha256"), "Public asset filtering failed");
+                Assert(UpdateChecker.PublicReleaseTag(new Uri("https://github.com/Rephl3x/Shim/releases/tag/v0.8.2"), "Rephl3x/Shim") == "v0.8.2", "Release tag parsing failed");
+                Throws(() => UpdateChecker.PublicReleaseTag(new Uri("https://github.com.evil.example/Rephl3x/Shim/releases/tag/v0.8.2"), "Rephl3x/Shim"));
+                string hash = new string('a', 64);
+                Assert(UpdateChecker.ParseSidecarSha256(hash + " *Shim-0.8.2.zip\n", "Shim-0.8.2.zip") == "sha256:" + hash, "Checksum parsing failed");
+                Throws(() => UpdateChecker.ParseSidecarSha256(hash + " *other.zip", "Shim-0.8.2.zip"));
+            });
             Test("Setup draft changes never mutate the active profile", () => {
                 var current = Profile(); current.Rig = new RigChoices { Wheel = "wheel" }; var copy = SetupLogic.Clone(current);
                 copy.Devices.Clear(); copy.Bindings[0].Invert = true; copy.Rig.Wheel = "changed";

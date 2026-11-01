@@ -11,14 +11,16 @@
 
 This addresses rigs where steering works but force feedback goes missing because Forza binds a different device. Shim uses HidHide while the bridge runs so the selected physical controllers do not compete with the virtual wheel. You still create and bind a custom wheel profile in Forza. Shim does not change USB device order, patch the game, or inject into it.
 
-## Download Shim 0.8.1
+## Download Shim 0.8.2
 
 | Download | Use it for |
 | --- | --- |
-| [Windows installer](https://github.com/Rephl3x/Shim/releases/download/v0.8.1/Shim-Setup-0.8.1.exe) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.1/Shim-Setup-0.8.1.exe.sha256)) | Installing or upgrading Shim. It includes the vJoy and HidHide installers and can back up existing settings. |
-| [Portable ZIP](https://github.com/Rephl3x/Shim/releases/download/v0.8.1/Shim-0.8.1.zip) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.1/Shim-0.8.1.zip.sha256)) | Running from an extracted folder. Keep `Shim.exe` beside its `drivers` and `runtime` folders. |
+| [Windows installer](https://github.com/Rephl3x/Shim/releases/download/v0.8.2/Shim-Setup-0.8.2.exe) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.2/Shim-Setup-0.8.2.exe.sha256)) | Installing or upgrading Shim. It includes the vJoy and HidHide installers and can back up existing settings. |
+| [Portable ZIP](https://github.com/Rephl3x/Shim/releases/download/v0.8.2/Shim-0.8.2.zip) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.2/Shim-0.8.2.zip.sha256)) | Running from an extracted folder. Keep `Shim.exe` beside its `drivers` and `runtime` folders. |
 
-Version 0.8.1 adds controller-visibility and XInput-slot diagnostics to help trace cases where Forza assigns vJoy to Device 2 and sends no FFB packets. Support reports now identify the selected physical controllers, virtual controllers, configured vJoy slot, and HidHide rule status. Shim also verifies that HidHide accepted its hiding rules before the bridge runs. This update helps identify the cause; it does not change how Forza numbers devices.
+Version 0.8.2 fixes update checks when GitHub's unauthenticated API rate limit is exhausted. Shim falls back to GitHub's public release pages, checks asset sizes, and verifies the Shim ZIP against its published SHA-256 checksum. If an older Shim cannot check for updates, install 0.8.2 from the link above; the installer can preserve and back up your settings.
+
+Version 0.8.1 added controller-visibility and XInput-slot diagnostics to help trace cases where Forza assigns vJoy to Device 2 and sends no FFB packets. Support reports identify selected physical controllers, virtual controllers, the vJoy slot, and HidHide rule status. Shim also verifies that HidHide accepted its hiding rules before the bridge runs. These diagnostics do not change how Forza numbers devices.
 
 **Requirements:** Windows 10/11 x64 and .NET Framework 4.8 or later. Driver installation and vJoy configuration need Windows administrator approval; restart if a driver installer asks. The vJoy and HidHide vendor installers are checked for signatures and hashes before packaging. Shim's own app and setup executables are currently unsigned.
 
