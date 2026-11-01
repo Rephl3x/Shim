@@ -80,6 +80,8 @@ namespace RigBridge
             data["windowsVersion"] = Environment.OSVersion.VersionString;
             data["architecture"] = Environment.Is64BitOperatingSystem ? "x64" : "x86";
             data["createdUtc"] = DateTime.UtcNow.ToString("o");
+            try { data["xInputSlotsSeenByShim"] = XInputProbe.ConnectedSlots(); }
+            catch (Exception ex) { data["xInputCheckError"] = ex.GetType().Name; }
             data["cpu"] = QueryWmi("SELECT Name,NumberOfCores,NumberOfLogicalProcessors FROM Win32_Processor", new[] { "Name", "NumberOfCores", "NumberOfLogicalProcessors" });
             data["memory"] = QueryWmi("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem", new[] { "TotalPhysicalMemory" });
             data["gpu"] = QueryWmi("SELECT Name,DriverVersion,VideoProcessor FROM Win32_VideoController", new[] { "Name", "DriverVersion", "VideoProcessor" });

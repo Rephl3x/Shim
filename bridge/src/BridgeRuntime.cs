@@ -97,6 +97,14 @@ namespace RigBridge
                             messages.Enqueue("More than one vJoy controller is enabled. Forza may bind to the wrong one; disable unused vJoy slots in Configure vJoy.");
                         if (virtualControllers.Count == 1 && otherControllers.Count == 0)
                             messages.Enqueue("Only one vJoy controller was detected outside the selected physical devices. If FFB packets stay at 0, check the wheel profile selected inside Forza.");
+                        try
+                        {
+                            var xinputSlots = XInputProbe.ConnectedSlots();
+                            if (xinputSlots.Length > 0)
+                                messages.Enqueue("Shim can read XInput controller slot(s): " + String.Join(", ", xinputSlots) +
+                                    ". HidHide may conceal them from Forza; this check alone cannot prove what the game sees.");
+                        }
+                        catch (Exception ex) { messages.Enqueue("XInput slot check unavailable: " + ex.GetType().Name); }
                     }
                     foreach (var info in all.Where(d => !d.Virtual && profile.Devices.Contains(d.Id)))
                         readers.Add(direct.Open(info, window, !monitorOnly && profile.EnableFfb && info.Id == profile.FfbDevice));
