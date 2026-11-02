@@ -156,6 +156,16 @@ namespace RigBridge
                 content.Controls.Add(Row(Caption("Sequential / paddles"), sequential)); content.Controls.Add(Row(Caption("Analog handbrake"), handbrake));
                 content.Controls.Add(Copy("Include other controllers below. Devices chosen above are already included; wheel buttons are included with the wheel."));
                 content.Controls.Add(extras); content.Controls.Add(keepExisting);
+                var testInputs = MakeButton("Check which device responds");
+                testInputs.Click += (s, e) => {
+                    using (var check = new InputDiagnostics(devices))
+                        if (check.ShowDialog(this) == DialogResult.OK && !String.IsNullOrEmpty(check.SelectedWheelId))
+                        {
+                            for (int i = 1; i < wheel.Items.Count; i++) if (((DeviceChoice)wheel.Items[i]).Id == check.SelectedWheelId) { wheel.SelectedIndex = i; break; }
+                            message.Text = "Steering wheel selected from the live input check. Continue to calibrate it on the next step.";
+                        }
+                };
+                content.Controls.Add(testInputs);
                 var scan = MakeButton("Refresh connected devices"); scan.Click += (s, e) => { try { choices = ReadChoices(); using (var input = new DirectInput()) devices = input.Enumerate().Where(d => !d.Virtual).ToList(); roleControlsReady = false; ShowPage(2); } catch (Exception ex) { message.Text = ex.Message; } }; content.Controls.Add(scan);
             }
             else if (page == 3)

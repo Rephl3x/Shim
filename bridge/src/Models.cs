@@ -138,6 +138,35 @@ namespace RigBridge
         public static string ProfilePath { get { return Path.Combine(DirectoryPath, "profile.json"); } }
         public static string OptionsPath { get { return Path.Combine(DirectoryPath, "options.json"); } }
         public static string RecoveryPath { get { return Path.Combine(DirectoryPath, "hiding-recovery.json"); } }
+        public static string ResetConfiguration(params string[] paths)
+        { return ResetConfigurationIn(Path.Combine(DirectoryPath, "config-backups"), paths); }
+        internal static string ResetConfigurationIn(string backupRoot, params string[] paths)
+        {
+            string folder = Path.Combine(backupRoot, "reset-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N"));
+            var files = paths.Where(path => !String.IsNullOrEmpty(path) && File.Exists(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (files.Count == 0) return null;
+            Directory.CreateDirectory(folder);
+            var moved = new List<KeyValuePair<string, string>>();
+            try
+            {
+                foreach (string path in files)
+                {
+                    string target = Path.Combine(folder, Path.GetFileName(path));
+                    if (moved.Any(item => String.Equals(item.Value, target, StringComparison.OrdinalIgnoreCase)))
+                        throw new InvalidOperationException("Two settings files have the same name; reset was cancelled.");
+                    File.Copy(path, target, false);
+                    moved.Add(new KeyValuePair<string, string>(path, target));
+                }
+                foreach (var item in moved) File.Delete(item.Key);
+                return folder;
+            }
+            catch
+            {
+                foreach (var item in moved)
+                    if (!File.Exists(item.Key) && File.Exists(item.Value)) File.Copy(item.Value, item.Key, false);
+                throw;
+            }
+        }
         public static BridgeProfile LoadProfile(string path, BridgeProfile fallback)
         {
             var profile = File.Exists(path) ? Read<BridgeProfile>(path) : SetupLogic.Clone(fallback);

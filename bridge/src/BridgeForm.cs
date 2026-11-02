@@ -31,6 +31,7 @@ namespace RigBridge
         private readonly Button refreshForzaTargets = Button("Find installed games");
         private readonly Label forzaDiscoveryStatus = new Label { AutoSize = true };
         private readonly Button checkUpdates = Button("Check for updates");
+        private readonly Button resetSettings = Button("Reset to defaults"), resetAndSetup = Button("Reset and reconfigure"), checkInputs = Button("Check physical inputs");
         private readonly Label updateCheckStatus = new Label { AutoSize = true, Tag = "Muted" };
         private readonly ToolTip updateToolTips = new ToolTip();
         private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 60 };
@@ -38,7 +39,7 @@ namespace RigBridge
         private List<PhysicalDevice> available = new List<PhysicalDevice>();
         private BridgeProfile profile = new BridgeProfile();
         private BridgeRuntime runtime;
-        private bool scanning, closing, learning, profileConfigBlocked, optionsConfigBlocked;
+        private bool scanning, closing, learning, profileConfigBlocked, optionsConfigBlocked, resetting;
         private DateTime learnDeadline;
         private string learnKind;
         private int learnIndex;
@@ -95,6 +96,9 @@ namespace RigBridge
             refresh.Click += async (s, e) => await RefreshAsync();
             save.Click += (s, e) => SaveProfile();
             setupWizard.Click += async (s, e) => await RunSetup();
+            resetSettings.Click += async (s, e) => await ResetSettingsAsync(false);
+            resetAndSetup.Click += async (s, e) => await ResetSettingsAsync(true);
+            checkInputs.Click += (s, e) => { using (var check = new InputDiagnostics(available)) check.ShowDialog(this); };
             startForza.Click += async (s, e) => await StartForzaAsync();
             checkUpdates.Click += async (s, e) => await CheckForUpdatesAsync();
             startBridgeWithForza.CheckedChanged += (s, e) => SaveOptions();
@@ -164,7 +168,7 @@ namespace RigBridge
             var help = Button("Help & reports"); help.AutoSize = false; help.Size = new Size(168, 44); help.TextAlign = ContentAlignment.MiddleLeft; help.Margin = new Padding(0, 0, 0, 8);
             help.Click += (s, e) => ShowView("Help"); navigation.Add("Help", help); railFooter.Controls.Add(help);
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.8.2"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 2); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.8.3"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 2); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
@@ -274,6 +278,11 @@ namespace RigBridge
             note.Tag = "Muted"; note.MaximumSize = new Size(830, 0); note.Margin = new Padding(0, 0, 0, 18); layout.Controls.Add(note);
             forzaDiscoveryStatus.Text = "Shim can find installed Forza games from the Xbox app, Steam, and Start Menu shortcuts.";
             forzaDiscoveryStatus.Tag = "Muted"; forzaDiscoveryStatus.MaximumSize = new Size(830, 0); layout.Controls.Add(forzaDiscoveryStatus);
+            layout.Controls.Add(Heading("Recovery and configuration"));
+            var resetNote = Label("Reset backs up your profile, mappings, calibration, game launch choice and theme. It restores Shim's device-hiding session first. Drivers and Forza's saved wheel profiles are not changed.");
+            resetNote.Tag = "Muted"; resetNote.MaximumSize = new Size(830, 0); layout.Controls.Add(resetNote);
+            resetSettings.Tag = "Ghost"; resetAndSetup.Tag = "Danger";
+            layout.Controls.Add(Flow(resetSettings, resetAndSetup));
             card.Controls.Add(layout); AddView("Options", card);
         }
         private void BuildUpdates()
@@ -306,6 +315,10 @@ namespace RigBridge
             var createReport = Button("Create / submit report"); createReport.Tag = "Primary";
             createReport.Click += async (s, e) => await CreateSupportReportAsync();
             createReport.Margin = new Padding(0, 0, 0, 16); checklist.Controls.Add(createReport);
+
+            checklist.Controls.Add(Heading("Check the physical devices first"));
+            checklist.Controls.Add(HelpText("Close Forza and stop the bridge. Use the read-only check below; turn the wheel, press pedals and select each gear separately. A device should show Responding. If it is absent or cannot be read, check its power and USB connection, then look for a disabled or problem device in Windows Device Manager. Re-enable or repair it there and refresh Shim. If two device names respond to one movement, check your wheel software for mirrored or combined inputs before reconfiguring."));
+            checkInputs.Tag = "Ghost"; checklist.Controls.Add(checkInputs);
 
             checklist.Controls.Add(Heading("1. Start the bridge before Forza"));
             checklist.Controls.Add(HelpText("Close Forza completely. In Shim, start the bridge and wait for Running. Then start Forza, preferably with Start Forza or the Start bridge when I click Start Forza option. Restart the game any time you stop or restart the bridge."));
@@ -556,7 +569,7 @@ namespace RigBridge
         }
         private void SaveOptions()
         {
-            if (previewPath != null || scanningForza) return;
+            if (previewPath != null || scanningForza || resetting) return;
             if (optionsConfigBlocked) { Log("Options are read-only because this Shim version could not safely load their saved format. Update Shim or choose fresh settings in its installer."); return; }
             options.StartBridgeWithForza = startBridgeWithForza.Checked;
             var target = forzaTarget.SelectedItem as ForzaGameTarget;
@@ -684,6 +697,11 @@ namespace RigBridge
         {
             if (runtime != null || scanning || previewPath != null) return;
             if (profileConfigBlocked) { MessageBox.Show(this, "Shim could not safely read the saved rig profile, so setup is disabled to protect it. Update Shim or select fresh settings in the installer. The original file has not been changed.", "Profile kept safe", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (File.Exists(Store.RecoveryPath))
+            {
+                try { HideSession.RecoverFile(Store.RecoveryPath, true); await RefreshAsync(); Log("Restored device visibility before setup."); }
+                catch (Exception ex) { MessageBox.Show(this, "Shim could not restore device visibility before setup: " + ex.Message, "Restore visibility first", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            }
             CaptureSelections();
             using (var wizard = new SetupWizard(profile, available, null, 0))
             {
@@ -694,6 +712,32 @@ namespace RigBridge
                 dll.Text = String.IsNullOrEmpty(profile.VjoyDll) ? Vjoy.DefaultDll : profile.VjoyDll;
             }
             await RefreshAsync(); Log("Setup saved. Start the bridge, then launch Forza and bind your virtual wheel controls.");
+        }
+        private async Task ResetSettingsAsync(bool reconfigure)
+        {
+            if (runtime != null || scanning || previewPath != null || resetting) return;
+            string action = reconfigure ? "Reset and reconfigure" : "Reset to defaults";
+            if (MessageBox.Show(this,
+                "Shim will back up its current profile, mappings, calibration, launch choice, theme and unfinished setup. Any previous hiding session will be restored first. vJoy and HidHide remain installed.\r\n\r\nContinue?",
+                action, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            resetting = true; UpdateButtons();
+            try
+            {
+                if (File.Exists(Store.RecoveryPath)) HideSession.RecoverFile(Store.RecoveryPath, true);
+                string backup = Store.ResetConfiguration(profilePath, optionsPath, Appearance.Path, Path.Combine(Store.DirectoryPath, "setup-draft.json"));
+                profile = new BridgeProfile(); options = new ShimOptions(); profileConfigBlocked = optionsConfigBlocked = false;
+                pendingGainSave = false; lastPackets = lastStarts = 0;
+                enableFfb.Checked = false; invert.Checked = false; SyncGain(profile.FfbGain); virtualId.Value = 1; dll.Text = Vjoy.DefaultDll;
+                startBridgeWithForza.Checked = false; forzaTarget.SelectedIndex = -1; Appearance.ResetToDefault();
+                await RefreshAsync(); await RefreshForzaTargets();
+                Log("Settings reset to defaults." + (backup == null ? " No saved configuration was found." : " Backup: " + backup));
+                MessageBox.Show(this, "Shim settings are back at defaults." + (backup == null ? "" : "\r\n\r\nBackup folder:\r\n" + backup) +
+                    "\r\n\r\nCheck each physical device before starting the bridge. Forza's saved wheel profile may need fresh bindings.",
+                    action, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex) { Log("Settings reset failed: " + ex.Message); MessageBox.Show(this, ex.Message, action + " failed", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+            finally { resetting = false; UpdateButtons(); }
+            if (reconfigure) await RunSetup();
         }
         private void CaptureSelections()
         {
@@ -817,7 +861,9 @@ namespace RigBridge
                     row.CanUpdate;
             learn.Enabled = runtime != null && runtime.IsMonitorOnly && runtime.Started;
             foreach (var action in setupActions) action.Enabled = idle && !profileConfigBlocked && previewPath == null;
-            setupWizard.Enabled = idle && !profileConfigBlocked && previewPath == null;
+            setupWizard.Enabled = idle && !resetting && !profileConfigBlocked && previewPath == null;
+            resetSettings.Enabled = resetAndSetup.Enabled = idle && !resetting && previewPath == null;
+            checkInputs.Enabled = idle && !resetting && previewPath == null;
             UpdateOverview();
         }
         private void InstallDriver(bool vjoy)

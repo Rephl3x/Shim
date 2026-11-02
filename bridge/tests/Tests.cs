@@ -22,6 +22,20 @@ namespace RigBridge.Tests
         private static void Run()
         {
             PhysicalForceTests.Run(Test);
+            Test("Reset backs up settings before removing them and preserves recovery files", () => {
+                string root = Path.Combine(Path.GetTempPath(), "Shim-reset-test-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(root);
+                try
+                {
+                    string profile = Path.Combine(root, "profile.json"), options = Path.Combine(root, "options.json"), recovery = Path.Combine(root, "hiding-recovery.json");
+                    File.WriteAllText(profile, "profile data"); File.WriteAllText(options, "option data"); File.WriteAllText(recovery, "recovery data");
+                    string backup = Store.ResetConfigurationIn(Path.Combine(root, "backups"), profile, options);
+                    Assert(!File.Exists(profile) && !File.Exists(options), "Settings were not reset");
+                    Assert(File.ReadAllText(Path.Combine(backup, "profile.json")) == "profile data" && File.ReadAllText(Path.Combine(backup, "options.json")) == "option data", "Backup lost settings");
+                    Assert(File.ReadAllText(recovery) == "recovery data", "Recovery record was changed");
+                }
+                finally { Directory.Delete(root, true); }
+            });
             Test("Public GitHub release fallback accepts only matching release assets", () => {
                 string html = "<a href=\"/Rephl3x/Shim/releases/download/v0.8.2/Shim-0.8.2.zip\"></a>" +
                     "<a href=\"/Rephl3x/Shim/releases/download/v0.8.2/Shim-0.8.2.zip.sha256\"></a>" +

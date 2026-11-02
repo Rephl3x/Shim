@@ -65,6 +65,11 @@ namespace RigBridge
             Mode = mode; Colors = Palette.For(mode);
             var changed = Changed; if (changed != null) changed();
         }
+        public static void ResetToDefault()
+        {
+            persistenceBlocked = false;
+            Set("Day", false);
+        }
         public static void Apply(Control root)
         {
             var p = Colors; string role = root.Tag as string;
