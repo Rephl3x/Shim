@@ -50,9 +50,9 @@ jobs:
           path: |
             build/test/Shim.exe
             build/test/Shim.Tests.exe
-            dist/latest/Shim-0.8.3.zip
-            dist/latest/Shim-0.8.3.zip.sha256
-            dist/latest/Shim-Setup-0.8.3.exe
-            dist/latest/Shim-Setup-0.8.3.exe.sha256
+            dist/latest/Shim-0.8.4.zip
+            dist/latest/Shim-0.8.4.zip.sha256
+            dist/latest/Shim-Setup-0.8.4.exe
+            dist/latest/Shim-Setup-0.8.4.exe.sha256
           if-no-files-found: error
           retention-days: 14

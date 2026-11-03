@@ -24,7 +24,9 @@ namespace RigBridge
         private readonly TextBox log = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Font = new Font("Consolas", 9) };
         private readonly ComboBox outputControl = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 175 };
         private readonly CheckBox invertAxis = new CheckBox { Text = "Invert axis", AutoSize = true };
-        private readonly NumericUpDown deadzone = new NumericUpDown { Minimum = 0, Maximum = 40, Width = 50 };
+        private readonly NumericUpDown deadzone = new NumericUpDown { Minimum = 0, Maximum = 40, Width = 58 };
+        private readonly NumericUpDown selectedAxisDeadzone = new NumericUpDown { Minimum = 0, Maximum = 40, Width = 58 };
+        private readonly Button applyAxisDeadzone = Button("Apply deadzone");
         private readonly Button startForza = Button("Start Forza"), start = Button("Start bridge"), stop = Button("Stop / restore devices"), watch = Button("Monitor inputs"), refresh = Button("Refresh devices"), save = Button("Save profile"), learn = Button("Learn selected output"), autoButtons = Button("Map all buttons"), remove = Button("Remove mapping"), recover = Button("Restore visibility");
         private readonly ComboBox forzaTarget = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 380 };
         private readonly CheckBox startBridgeWithForza = new CheckBox { Text = "Start bridge when I click Start Forza", AutoSize = true };
@@ -114,6 +116,8 @@ namespace RigBridge
             learn.Click += (s, e) => BeginLearn();
             autoButtons.Click += (s, e) => AutoMapButtons();
             remove.Click += (s, e) => { if (mappings.SelectedRows.Count > 0) { profile.Bindings.Remove((Binding)mappings.SelectedRows[0].Tag); RenderMappings(); } };
+            mappings.SelectionChanged += (s, e) => UpdateAxisDeadzone();
+            applyAxisDeadzone.Click += (s, e) => ApplyAxisDeadzone();
             recover.Click += (s, e) => {
                 try
                 {
@@ -168,7 +172,7 @@ namespace RigBridge
             var help = Button("Help & reports"); help.AutoSize = false; help.Size = new Size(168, 44); help.TextAlign = ContentAlignment.MiddleLeft; help.Margin = new Padding(0, 0, 0, 8);
             help.Click += (s, e) => ShowView("Help"); navigation.Add("Help", help); railFooter.Controls.Add(help);
             setupWizard.Width = 168; setupWizard.AutoSize = false; setupWizard.Tag = "Active"; railFooter.Controls.Add(setupWizard);
-            var version = Label("Version 0.8.3"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 2); root.Controls.Add(rail, 0, 0);
+            var version = Label("Version 0.8.4"); version.Tag = "Muted"; version.Font = new Font("Segoe UI", 9); railFooter.Controls.Add(version); rail.Controls.Add(railFooter, 0, 2); root.Controls.Add(rail, 0, 0);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 24, 26, 20), ColumnCount = 1, RowCount = 3, Tag = "Page" };
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
@@ -245,7 +249,11 @@ namespace RigBridge
             for (int i = 0; i < 4; i++) outputControl.Items.Add(new OutputChoice { Kind = "POV", Index = i, Name = "POV " + (i + 1) });
             outputControl.SelectedIndex = 0;
             learn.Text = "Learn control"; autoButtons.Text = "Auto-map buttons"; remove.Text = "Remove"; refresh.Text = "Refresh devices";
-            area.Controls.Add(Flow(outputControl, invertAxis, Label("Deadzone %"), deadzone, learn), 0, 2); area.Controls.Add(Flow(autoButtons, remove, save), 0, 3); mappingCard.Controls.Add(area); layout.Controls.Add(mappingCard, 2, 0); AddView("Mappings", layout);
+            var axisTools = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+            axisTools.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); axisTools.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            axisTools.Controls.Add(Flow(outputControl, invertAxis, Label("New deadzone %"), deadzone, learn), 0, 0);
+            axisTools.Controls.Add(Flow(Label("Selected axis deadzone %"), selectedAxisDeadzone, applyAxisDeadzone), 0, 1);
+            area.Controls.Add(axisTools, 0, 2); area.Controls.Add(Flow(autoButtons, remove, save), 0, 3); mappingCard.Controls.Add(area); layout.Controls.Add(mappingCard, 2, 0); AddView("Mappings", layout);
         }
         private void BuildDrivers()
         {
@@ -827,6 +835,30 @@ namespace RigBridge
             UpdateOverview();
         }
         private static string OutputName(Binding binding) { return binding.OutputKind == "Axis" ? Mapper.AxisNames[binding.OutputIndex] : (String.IsNullOrEmpty(binding.Label) ? "" : binding.Label + " / ") + binding.OutputKind + " " + (binding.OutputIndex + 1); }
+        private Binding SelectedAxisBinding()
+        {
+            if (mappings.SelectedRows.Count == 0) return null;
+            var binding = mappings.SelectedRows[0].Tag as Binding;
+            return binding != null && binding.OutputKind == "Axis" ? binding : null;
+        }
+        private void UpdateAxisDeadzone()
+        {
+            var binding = SelectedAxisBinding();
+            if (binding != null) selectedAxisDeadzone.Value = Math.Max(selectedAxisDeadzone.Minimum, Math.Min(selectedAxisDeadzone.Maximum, (decimal)Math.Round(binding.Deadzone * 100)));
+            bool enabled = binding != null && runtime == null && !scanning && !resetting && !profileConfigBlocked && previewPath == null;
+            selectedAxisDeadzone.Enabled = applyAxisDeadzone.Enabled = enabled;
+        }
+        private void ApplyAxisDeadzone()
+        {
+            var binding = SelectedAxisBinding();
+            if (binding == null || runtime != null || scanning || resetting || profileConfigBlocked) return;
+            double previous = binding.Deadzone;
+            binding.Deadzone = (double)selectedAxisDeadzone.Value / 100;
+            if (!SaveProfile()) { binding.Deadzone = previous; return; }
+            Log("Set " + OutputName(binding) + " deadzone to " + selectedAxisDeadzone.Value + "%. Restart the bridge to use it.");
+            RenderMappings();
+            foreach (DataGridViewRow row in mappings.Rows) if (Object.ReferenceEquals(row.Tag, binding)) { row.Selected = true; break; }
+        }
         private void RenderMappings()
         {
             mappings.Rows.Clear();
@@ -839,6 +871,7 @@ namespace RigBridge
                 int row = mappings.Rows.Add(OutputName(binding), device == null ? "Missing device" : device.Name, inputName, options);
                 mappings.Rows[row].Tag = binding;
             }
+            UpdateAxisDeadzone();
         }
         private void UpdateButtons()
         {
@@ -862,6 +895,7 @@ namespace RigBridge
             learn.Enabled = runtime != null && runtime.IsMonitorOnly && runtime.Started;
             foreach (var action in setupActions) action.Enabled = idle && !profileConfigBlocked && previewPath == null;
             setupWizard.Enabled = idle && !resetting && !profileConfigBlocked && previewPath == null;
+            UpdateAxisDeadzone();
             resetSettings.Enabled = resetAndSetup.Enabled = idle && !resetting && previewPath == null;
             checkInputs.Enabled = idle && !resetting && previewPath == null;
             UpdateOverview();

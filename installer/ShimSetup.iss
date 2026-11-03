@@ -15,21 +15,21 @@
 [Setup]
 AppId={{3394DE67-9291-418E-B369-B2F43CC1D112}
 AppName=Shim
-AppVersion=0.8.3
-AppVerName=Shim 0.8.3
+AppVersion=0.8.4
+AppVerName=Shim 0.8.4
 AppPublisher=AMS Labs
 AppPublisherURL=https://github.com/Rephl3x/Shim
 AppSupportURL=https://github.com/Rephl3x/Shim/issues
 DefaultDirName={autopf}\Shim
 UsePreviousAppDir=yes
 DefaultGroupName=Shim
-UninstallDisplayName=Shim 0.8.3
+UninstallDisplayName=Shim 0.8.4
 UninstallDisplayIcon={app}\Shim.exe
 OutputDir={#ShimSetupOutput}
-OutputBaseFilename=Shim-Setup-0.8.3
+OutputBaseFilename=Shim-Setup-0.8.4
 SetupIconFile={#ShimProjectRoot}\assets\shim-app-icon.ico
-VersionInfoVersion=0.8.3.0
-VersionInfoProductVersion=0.8.3
+VersionInfoVersion=0.8.4.0
+VersionInfoProductVersion=0.8.4
 ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 PrivilegesRequired=admin

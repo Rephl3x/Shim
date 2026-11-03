@@ -11,14 +11,14 @@
 
 This addresses rigs where steering works but force feedback goes missing because Forza binds a different device. Shim uses HidHide while the bridge runs so the selected physical controllers do not compete with the virtual wheel. You still create and bind a custom wheel profile in Forza. Shim does not change USB device order, patch the game, or inject into it.
 
-## Download Shim 0.8.3
+## Download Shim 0.8.4
 
 | Download | Use it for |
 | --- | --- |
-| [Windows installer](https://github.com/Rephl3x/Shim/releases/download/v0.8.3/Shim-Setup-0.8.3.exe) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.3/Shim-Setup-0.8.3.exe.sha256)) | Installing or upgrading Shim. It includes the vJoy and HidHide installers and can back up existing settings. |
-| [Portable ZIP](https://github.com/Rephl3x/Shim/releases/download/v0.8.3/Shim-0.8.3.zip) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.3/Shim-0.8.3.zip.sha256)) | Running from an extracted folder. Keep `Shim.exe` beside its `drivers` and `runtime` folders. |
+| [Windows installer](https://github.com/Rephl3x/Shim/releases/download/v0.8.4/Shim-Setup-0.8.4.exe) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.4/Shim-Setup-0.8.4.exe.sha256)) | Installing or upgrading Shim. It includes the vJoy and HidHide installers and can back up existing settings. |
+| [Portable ZIP](https://github.com/Rephl3x/Shim/releases/download/v0.8.4/Shim-0.8.4.zip) ([SHA-256](https://github.com/Rephl3x/Shim/releases/download/v0.8.4/Shim-0.8.4.zip.sha256)) | Running from an extracted folder. Keep `Shim.exe` beside its `drivers` and `runtime` folders. |
 
-Version 0.8.3 adds **Reset to defaults** and **Reset and reconfigure** under Options. Both back up Shim settings and restore any active device-hiding session before clearing the profile. The setup wizard and Help page now offer **Check physical inputs**, which shows each controller's live response without sending forces or changing device visibility. In setup, turn only the wheel during identification to select the physical device that actually responds. Check every pedal and gear before finishing. If an older Shim cannot check for updates, install this version from the link above; the installer can preserve and back up your settings.
+Version 0.8.4 lets you change the deadzone of an existing axis mapping: on **Mappings**, select an axis row, set **Selected axis deadzone %**, then click **Apply deadzone**. The setting saves immediately; restart the bridge to use it. Steering deadzone is centered, while pedal and handbrake deadzones start at the released end. Version 0.8.3 added **Reset to defaults**, **Reset and reconfigure**, and read-only physical input checks. If an older Shim cannot check for updates, install this version from the link above; the installer can preserve and back up your settings.
 
 Version 0.8.1 added controller-visibility and XInput-slot diagnostics to help trace cases where Forza assigns vJoy to Device 2 and sends no FFB packets. Support reports identify selected physical controllers, virtual controllers, the vJoy slot, and HidHide rule status. Shim also verifies that HidHide accepted its hiding rules before the bridge runs. These diagnostics do not change how Forza numbers devices.
 

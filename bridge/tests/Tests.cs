@@ -174,6 +174,18 @@ namespace RigBridge.Tests
                 var state = new InputState(); var input = new Dictionary<string, InputState> { { "wheel", state } };
                 foreach (double value in new[] { 0.46, 0.5, 0.54 }) { state.Axes[0] = value; Assert(Mapper.Map(new[] { binding }, input).Axes[0] == 0.5, "Center deadzone failed"); }
             });
+            Test("Axis deadzone persists with its mapping", () => {
+                string directory = Path.Combine(Path.GetTempPath(), "Shim-deadzone-test-" + Guid.NewGuid().ToString("N"));
+                string path = Path.Combine(directory, "profile.json");
+                try
+                {
+                    var profile = Profile(); profile.Bindings[0].Deadzone = 0.25;
+                    Store.Write(path, profile);
+                    var restored = Store.LoadProfile(path, new BridgeProfile());
+                    Assert(Math.Abs(restored.Bindings[0].Deadzone - 0.25) < 0.0001, "Saved axis deadzone changed");
+                }
+                finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+            });
             Test("Pedal calibration clamps and preserves full travel", () => {
                 var binding = Axis("pedals", 0, 1); binding.Minimum = 0.2; binding.Maximum = 0.8;
                 var state = new InputState(); var input = new Dictionary<string, InputState> { { "pedals", state } };
